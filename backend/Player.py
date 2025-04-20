@@ -16,4 +16,10 @@ class Player():
 
     def action(self, input):
         #V0: Single player. Don't worry about blocking behavior right now.
-        return self.moves[input].damage
+        return (input, self.moves[input].damage)
+    
+    def getHealth(self):
+        return self.health
+    
+    def takeDamage(self, damageRecieved):
+        self.health -= damageRecieved
