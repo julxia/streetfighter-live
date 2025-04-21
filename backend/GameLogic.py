@@ -1,4 +1,5 @@
 import Player
+from recognition.models import RecognitionModels
 
 class GameLogic():
     def __init__(self, pose, speech):
@@ -6,21 +7,27 @@ class GameLogic():
         # to access when the read() method is called.
         self.gameState = "start"
         self.gameMode = "menu"
-        self.pose = pose
-        self.speech = speech
+        self.models = RecognitionModels()
+        self.isSinglePlayer = None
+
         # Get speech recognition model started and running
-        # self.speech.start_recognition()
-        self.player1 = None
-        self.player2 = None
+        self.models.start("voice")
+        # Ensures program does not proceed until speech recognition model is initialized
+        while not(self.models.is_initialized("voice")):
+            continue
+    
+        # Other vars we may need for V1
+        # self.player1 = None
+        # self.player2 = None
         # self.poseReady = False
         # self.speechReady = False
-        self.isSinglePlayer = None
 
     def start(self):
         self.gameState = "running"
-        # self.pose.start_recognition()
-        # while notSetup():
-            # continue
+        # Start gesture recognition and do not continue until the model is setup
+        self.models.start("pose")
+        while not(self.models.is_initialized("pose")):
+            continue
 
     # def initialize(self):
     #     pass
@@ -31,9 +38,9 @@ class GameLogic():
     def read(self):
         # 1. For starting the game in single or multi player game
         if self.gameState == "start":
-            if self.speech.read() == "single player":
+            if self.models.get_output("voice").output == "single player":
                 self.isSinglePlayer = True
-            elif self.speech.read() == "multiplayer":
+            elif self.models.get_output("voice").output == "multiplayer":
                 self.isSinglePlayer = False
             else:
                 self.isSinglePlayer = None
@@ -41,14 +48,14 @@ class GameLogic():
 
         # 2. For getting inputs while the game is running in single player
         elif self.gameState == "running":
-            if self.speech.get_speech() == "exit":
+            if self.models.get_output("voice").output == "exit":
                 return {"state": "terminate"}
             return {"state": self.gameState,
-                    "AttackType": self.pose.get_gesture()}
+                    "AttackType": self.models.get_output("pose").output}
 
     def terminate(self):
         # Shut down Hao's pose model and update gameState to start
-        # self.pose.stop()
+        self.models.stop("pose")
         self.gameState = "start"
 
     
