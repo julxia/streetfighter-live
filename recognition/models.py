@@ -10,7 +10,7 @@ class RecognitionModels:
         self.models = {
             "pose": PoseRecognition(
                 model_path="./models/pose/pose_landmarker_full.task",
-                display_camera=False,
+                display_camera=True,
             ),
             "voice": VoiceRecognition(
                 callback_function=speech_callback,
