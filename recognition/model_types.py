@@ -2,5 +2,5 @@ from pydantic import BaseModel
 
 
 class ModelOutput(BaseModel):
-    output: str
+    output: str | None
     confidence: float

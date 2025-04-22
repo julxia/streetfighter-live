@@ -3,6 +3,8 @@ import threading
 import queue
 import time
 
+from recognition.model_types import ModelOutput
+
 
 class VoiceRecognition:
     def __init__(
@@ -235,12 +237,12 @@ class VoiceRecognition:
                 print(f"Error in speech recognition: {e}")
                 time.sleep(1)  # Prevent tight loop if continuous errors
 
-    def get_output(self):
+    def get_output(self) -> ModelOutput:
         """Non-blocking method to get the latest recognized speech"""
         if not self.speech_queue.empty():
-            timestamp, text, confidence = self.speech_queue.get()
-            return {"output": text, "confidence": confidence}
-        return {"output": "None", "confidence": 1.0}
+            _, text, confidence = self.speech_queue.get()
+            return ModelOutput(output=text, confidence=confidence)
+        return ModelOutput(output=None, confidence=1.0)
 
     def recalibrate(self):
         """Recalibrate the recognizer during runtime if needed"""

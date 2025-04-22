@@ -31,7 +31,7 @@ class RecognitionModels:
         self.models[model].stop()
 
     def get_output(self, model: Literal["pose", "voice"]) -> ModelOutput:
-        self.models[model].get_output()
+        return self.models[model].get_output()
 
     def is_initialized(self, model: Literal["pose", "voice"]) -> bool:
         return self.models[model].is_initialized()

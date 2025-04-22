@@ -6,6 +6,8 @@ import time
 from mediapipe.framework.formats import landmark_pb2
 from threading import Thread
 
+from recognition.model_types import ModelOutput
+
 
 class GestureRecognizer:
     """Recognizes gestures based on pose landmarks"""
@@ -201,7 +203,7 @@ class PoseResultCallback:
             self.detected_gesture = None
             self.gesture_confidence = 0.0
 
-    def get_output(self):
+    def get_output(self) -> ModelOutput:
         """Return the gesture data as a JSON string"""
         if self.detected_gesture:
             data = {
@@ -210,7 +212,7 @@ class PoseResultCallback:
             }
         else:
             data = {"output": None, "confidence": 0.0}
-        return data
+        return ModelOutput(output=data["output"], confidence=data["confidence"])
 
 
 class PoseRecognition:
@@ -447,7 +449,7 @@ class PoseRecognition:
         """Get the confidence level of the currently detected gesture"""
         return self.pose_callback.gesture_confidence
 
-    def get_output(self):
+    def get_output(self) -> ModelOutput:
         """Get the gesture data as a dictionary"""
         return self.pose_callback.get_output()
 
