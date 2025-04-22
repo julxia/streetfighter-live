@@ -480,7 +480,7 @@ def example_usage():
     """Example of how to use the PoseRecognition API"""
     # Initialize pose recognition
     pose_system = PoseRecognition(
-        model_path="./models/pose/pose_landmarker_full.task", display_camera=True
+        model_path="./models/pose/pose_landmarker_full.task", display_camera=False
     )
 
     try:
@@ -501,18 +501,16 @@ def example_usage():
             gesture_data = pose_system.get_output()
 
             # Print the JSON data for demonstration
-            if gesture_data["output"]:
+            if gesture_data.output:
                 print(f"Gesture data: {gesture_data}")
 
             # Update game state based on gesture
-            if gesture_data["output"] and gesture_data["output"] != last_gesture:
+            if gesture_data.output and gesture_data.output != last_gesture:
                 print(
-                    f"Detected: {gesture_data['output']} with confidence {gesture_data['confidence']}"
+                    f"Detected: {gesture_data.output} with confidence {gesture_data.confidence}"
                 )
-                score += int(
-                    gesture_data["confidence"] * 10
-                )  # Score based on confidence
-                last_gesture = gesture_data["output"]
+                score += int(gesture_data.confidence * 10)  # Score based on confidence
+                last_gesture = gesture_data.output
 
             # Exit on keyboard interrupt
             if cv2.waitKey(5) & 0xFF == ord("q"):

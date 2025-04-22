@@ -10,7 +10,7 @@ class RecognitionModels:
         self.models = {
             "pose": PoseRecognition(
                 model_path="./models/pose/pose_landmarker_full.task",
-                display_camera=True,
+                display_camera=False,
             ),
             "voice": VoiceRecognition(
                 callback_function=speech_callback,
@@ -25,6 +25,7 @@ class RecognitionModels:
         }
 
     def start(self, model: Literal["pose", "voice"]) -> None:
+        
         self.models[model].start()
 
     def stop(self, model: Literal["pose", "voice"]) -> None:
@@ -35,3 +36,6 @@ class RecognitionModels:
 
     def is_initialized(self, model: Literal["pose", "voice"]) -> bool:
         return self.models[model].is_initialized()
+    
+    def get_frame(self):
+        return self.models['pose'].get_current_frame()
