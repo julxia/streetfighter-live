@@ -13,7 +13,9 @@ FPS = 60
 SCREEN_WIDTH = 1440
 SCREEN_HEIGHT = 900
 RED = (255, 0, 0)
-ATTACK_DISPLAY_DURATION = 4.0
+WHITE = (255, 255, 255)
+
+ATTACK_DISPLAY_DURATION = 1.0
 
 
 # game states
@@ -40,6 +42,9 @@ class Game:
         self.attack_timer = 0
         self.attack = None
         self.info_font = None
+
+        self.init_start_time = 0
+        self.init_duration = 2.0 
         
         self.load_start_assets()
         
@@ -64,7 +69,8 @@ class Game:
 
             title_width = self.title_img.get_width()
             title_height = self.title_img.get_height()
-
+            self.title_y_offset = 0
+            self.animation_time = 0
             scale_factor = 0.8
             self.title_img = pygame.transform.scale(
                 self.title_img,
@@ -74,8 +80,10 @@ class Game:
                 center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
             )
 
+            self.title_y_pos = SCREEN_HEIGHT // 2
+
             try:
-                self.info_font = pygame.font.Font(f'{FONTS_FOLDER_PATH}/PressStart2P-Regular.ttf', 24)
+                self.info_font = pygame.font.Font(f'{FONTS_FOLDER_PATH}/PressStart2P-Regular.ttf', 30)
             except:
                 self.info_font = pygame.font.Font(None, 18)
         except pygame.error as e:
@@ -93,7 +101,6 @@ class Game:
         #     raise RuntimeError(f"Could not open video capture device {0}")
         
         self.backend.start()
-        self.state = RUNNING
     
     def load_single_player_assets(self):
         self.running_bg = pygame.image.load(
@@ -126,11 +133,19 @@ class Game:
         return NotImplementedError
 
     def render_start(self):
+        
         self.screen.blit(self.start_bg, (0, 0))
         self.screen.blit(self.title_img, self.title_rect)
 
+        start_text = self.info_font.render("Say \'Single Player\' to start the game", True, WHITE)
+        start_rect = start_text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT * 3.5 // 4))
+        self.screen.blit(start_text, start_rect)
+
     def render_initialize(self):
         self.screen.blit(self.inital_bg, (0, 0))
+        init_text = self.info_font.render("Starting Single Player mode...", True, WHITE)
+        init_rect = init_text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT // 2))
+        self.screen.blit(init_text, init_rect)
     
     def render_running(self, frame):
         self.screen.blit(self.running_bg, (0, 0))
@@ -169,12 +184,12 @@ class Game:
         # Display attack text if we have one
         current_time = time.time()
         if self.attack and current_time < self.attack_timer:
-            attack_text = self.info_font.render(self.attack, True, RED)
-            attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3 // 4))
+            attack_text = self.info_font.render(self.attack, True, WHITE)
+            attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH // 4, SCREEN_HEIGHT * 3 // 4))
             self.screen.blit(attack_text, attack_rect)
     
     def render_end(self):
-        return
+        return NotImplementedError
 
     def render(self, frame):
         if self.state == START:
@@ -187,18 +202,23 @@ class Game:
             self.render_end()
 
     def handle_events(self, input):
+        current_time = time.time()
+
         if input != None:
             if self.state == START and input:
                 self.state = INITIALIZE
                 print("STARTING SINGLEPLAYER") 
-                self.initialize_game(True)               
+                self.initialize_game(True) 
+                self.init_start_time = time.time()              
             elif self.state == START and not input:
                 self.state = INITIALIZE
                 print("STARTING MULTIPLAYER")
                 self.initialize_game(False)
-            elif self.state == RUNNING and input:
-                self.attack = input['AttackType']
-                self.attack_timer = time.time() + ATTACK_DISPLAY_DURATION
+                self.init_start_time = time.time()
+            elif self.state == RUNNING and input and 'AttackType' in input:
+                if self.attack is None or current_time >= self.attack_timer:
+                    self.attack = input['AttackType']
+                    self.attack_timer = current_time + ATTACK_DISPLAY_DURATION
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -212,11 +232,26 @@ class Game:
 
                 if self.state == START and event.key == pygame.K_SPACE:
                     self.state = INITIALIZE
+                    self.init_start_time = time.time()
                 elif self.state == INITIALIZE and event.key == pygame.K_SPACE:
                     self.load_game_assets()
-                    self.state = RUNNING
                 elif self.state == END and event.key == pygame.K_r:
                     self.currentstate_state = START
+
+    def update(self):
+        self.animation_time += 0.05
+        current_time = time.time()
+
+        
+        if self.state == START:
+            self.title_y_offset = math.sin(self.animation_time) * 15
+            self.title_rect.centery = self.title_y_pos + self.title_y_offset
+        
+        if self.state == INITIALIZE and time.time() - self.init_start_time >= self.init_duration:
+            self.state = RUNNING
+        
+        if self.attack and current_time >= self.attack_timer:
+            self.attack = None
 
     def run(self):
         while True:
@@ -224,7 +259,7 @@ class Game:
             # print(input)
             self.handle_events(input)
             # Update game state
-            # self.update()
+            self.update()
             frame = self.backend.get_frame()
             self.render(frame)
 
