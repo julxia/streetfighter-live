@@ -28,11 +28,10 @@ class Game:
 
         # initialize backend game
         self.backend = GameLogic()
-        self.state = START
+        self.state = RUNNING
+        self.backend.start()
 
         self.load_start_assets()
-
-        return
 
     def load_start_assets(self):
         try:
@@ -67,11 +66,14 @@ class Game:
             print(f"ERROR loading images: {e}")
             return
 
-    def load_single_player_assets(self):
+    def initalize_single(self):
         return
+    
+    def load_single_player_assets(self):
+        return NotImplementedError
 
     def load_multiplayer_assets(self):
-        return
+        return NotImplementedError
 
     def render_start(self):
         self.screen.blit(self.start_bg, (0, 0))
@@ -99,11 +101,13 @@ class Game:
     def handle_events(self, input):
         if input != None:
             if self.state == START and input:
-                self.load_single_player_assets()
+                self.initialize_single()
                 print("STARTING SINGLEPLAYER")
+                self.state = INITIALIZE
             elif self.state == START and not input:
-                self.load_multiplayer_assets()
+                self.initalize_multi()
                 print("STARTING MULTIPLAYER")
+                self.state = INITIALIZE
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -126,6 +130,7 @@ class Game:
     def run(self):
         while True:
             input = self.backend.read()
+            print(input)
             self.handle_events(input)
             # Update game state
             # self.update()
