@@ -1,8 +1,8 @@
-import Player
+# import Player
 from recognition.models import RecognitionModels
 
 class GameLogic():
-    def __init__(self, pose, speech):
+    def __init__(self):
         # This gets the speech up and running. As well as initalizes the other variables 
         # to access when the read() method is called.
         self.gameState = "start"

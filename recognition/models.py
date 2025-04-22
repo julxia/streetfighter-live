@@ -1,7 +1,8 @@
 from typing import Literal
 
 from recognition.model_types import ModelOutput
-from recognition import PoseRecognition, VoiceRecognition
+from recognition.pose import PoseRecognition
+from recognition.voice import VoiceRecognition, speech_callback, street_fighter_commands
 
 
 class RecognitionModels:
