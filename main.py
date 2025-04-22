@@ -221,6 +221,7 @@ class Game:
     def run(self):
         while True:
             input = self.backend.read()
+            print(input)
             self.handle_events(input)
             # Update game state
             # self.update()
