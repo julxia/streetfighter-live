@@ -3,6 +3,7 @@ import threading
 import pickle
 import time
 import numpy as np
+import struct
 
 
 class GameServer:
@@ -27,42 +28,64 @@ class GameServer:
 
         try:
             while True:
-                # Receive data from client
-                try:
-                    data = client.recv(4096)
-                    if not data:
-                        break
-
-                    # Unpack the data (action and compressed frame)
-                    client_data = pickle.loads(data)
-
-                    # Update client data
-                    if "action" in client_data:
-                        action = client_data["action"]
-                        self.client_actions[client_id] = action
-
-                        # Process attack if valid
-                        if action and "AttackType" in action:
-                            self.process_attack(client_id, action["AttackType"])
-
-                    if "frame" in client_data:
-                        compressed_frame = client_data["frame"]
-                        if compressed_frame is not None:
-                            # Store compressed frame
-                            self.client_frames[client_id] = compressed_frame
-
-                    # Send game state back to client
-                    game_state = {
-                        "opponent_frame": self.client_frames[1 - client_id],
-                        "opponent_action": self.client_actions[1 - client_id],
-                        "player_health": self.player_health[client_id],
-                        "opponent_health": self.player_health[1 - client_id],
-                        "game_running": self.game_running,
-                    }
-
-                    client.sendall(pickle.dumps(game_state))
-                except socket.error:
+                # First receive the message size (4 bytes for a 32-bit unsigned int)
+                size_data = self.recv_all(client, 4)
+                if not size_data:
                     break
+
+                msg_size = struct.unpack("!I", size_data)[0]
+
+                # Now receive the actual message
+                data = self.recv_all(client, msg_size)
+                if not data:
+                    break
+
+                # Unpack the data (action and compressed frame)
+                client_data = pickle.loads(data)
+
+                # Update client data
+                if "action" in client_data:
+                    action = client_data["action"]
+                    self.client_actions[client_id] = action
+
+                    # Process attack if valid
+                    if action and isinstance(action, dict) and "AttackType" in action:
+                        self.process_attack(client_id, action["AttackType"])
+
+                if "frame" in client_data:
+                    compressed_frame = client_data["frame"]
+                    if compressed_frame is not None:
+                        # Store compressed frame
+                        self.client_frames[client_id] = compressed_frame
+
+                # Send game state back to client
+                game_state = {
+                    "opponent_frame": (
+                        self.client_frames[1 - client_id]
+                        if len(self.clients) > 1
+                        else None
+                    ),
+                    "opponent_action": (
+                        self.client_actions[1 - client_id]
+                        if len(self.clients) > 1
+                        else None
+                    ),
+                    "player_health": self.player_health[client_id],
+                    "opponent_health": (
+                        self.player_health[1 - client_id]
+                        if len(self.clients) > 1
+                        else 100
+                    ),
+                    "game_running": self.game_running,
+                    "players_connected": len(self.clients),
+                }
+
+                # Serialize the response
+                response = pickle.dumps(game_state)
+
+                # Send size of message first, then the message
+                client.sendall(struct.pack("!I", len(response)))
+                client.sendall(response)
 
         except Exception as e:
             print(f"Error handling client {client_id}: {e}")
@@ -75,6 +98,16 @@ class GameServer:
                 self.game_running = False
             client.close()
 
+    def recv_all(self, sock, n):
+        """Helper function to receive n bytes or return None if EOF is hit"""
+        data = bytearray()
+        while len(data) < n:
+            packet = sock.recv(n - len(data))
+            if not packet:
+                return None
+            data.extend(packet)
+        return data
+
     def process_attack(self, attacker_id, attack_type):
         """Process an attack from a player"""
         if not self.game_running:
@@ -84,12 +117,14 @@ class GameServer:
 
         # Define damage for different attack types
         damage = 0
-        if attack_type.lower() == "punch":
-            damage = 5
-        elif attack_type.lower() == "kick":
-            damage = 7
-        elif attack_type.lower() == "block":
-            return  # No damage for blocks
+        if attack_type and isinstance(attack_type, str):
+            attack_lower = attack_type.lower()
+            if attack_lower == "punch":
+                damage = 5
+            elif attack_lower == "kick":
+                damage = 7
+            elif attack_lower == "block":
+                return  # No damage for blocks
 
         # Apply damage to defender
         self.player_health[defender_id] -= damage
@@ -130,13 +165,19 @@ class GameServer:
                     if len(self.clients) == 2:
                         self.start_game()
                 else:
-                    # Server is full
-                    client.sendall(pickle.dumps({"error": "Server full"}))
+                    # Server is full - send an error message
+                    error_msg = pickle.dumps({"error": "Server full"})
+                    try:
+                        client.sendall(struct.pack("!I", len(error_msg)))
+                        client.sendall(error_msg)
+                    except:
+                        pass
                     client.close()
         except KeyboardInterrupt:
             print("Server shutting down...")
         finally:
-            self.server.close()
+            if hasattr(self, "server"):
+                self.server.close()
 
 
 if __name__ == "__main__":

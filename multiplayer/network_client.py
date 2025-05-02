@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import threading
 import time
+import struct
 
 
 class NetworkClient:
@@ -18,6 +19,7 @@ class NetworkClient:
         self.player_health = 100
         self.opponent_health = 100
         self.game_running = False
+        self.players_connected = 0
         self.lock = threading.Lock()
 
     def connect(self):
@@ -49,14 +51,19 @@ class NetworkClient:
                 resized_frame = cv2.resize(frame, (320, 240))
                 # Convert to JPEG format for compression
                 _, compressed_frame = cv2.imencode(
-                    ".jpg", resized_frame, [cv2.IMWRITE_JPEG_QUALITY, 50]
+                    ".jpg", resized_frame, [cv2.IMWRITE_JPEG_QUALITY, 40]
                 )
 
             # Create data packet
             data = {"action": action, "frame": compressed_frame}
 
-            # Send to server
-            self.client.sendall(pickle.dumps(data))
+            # Serialize the data
+            serialized_data = pickle.dumps(data)
+
+            # Send size of message first, then the message
+            self.client.sendall(struct.pack("!I", len(serialized_data)))
+            self.client.sendall(serialized_data)
+
         except Exception as e:
             print(f"Error sending data: {e}")
             self.connected = False
@@ -65,7 +72,15 @@ class NetworkClient:
         """Background thread to receive data from server"""
         while self.connected:
             try:
-                data = self.client.recv(1024000)  # Large buffer for frame data
+                # First receive the message size
+                size_data = self.recv_all(self.client, 4)
+                if not size_data:
+                    break
+
+                msg_size = struct.unpack("!I", size_data)[0]
+
+                # Now receive the actual message
+                data = self.recv_all(self.client, msg_size)
                 if not data:
                     break
 
@@ -99,6 +114,9 @@ class NetworkClient:
                     if "game_running" in game_state:
                         self.game_running = game_state["game_running"]
 
+                    if "players_connected" in game_state:
+                        self.players_connected = game_state["players_connected"]
+
                     if "error" in game_state:
                         print(f"Server error: {game_state['error']}")
                         self.connected = False
@@ -107,6 +125,20 @@ class NetworkClient:
                 print(f"Error receiving data: {e}")
                 self.connected = False
                 break
+
+    def recv_all(self, sock, n):
+        """Helper function to receive n bytes or return None if EOF is hit"""
+        data = bytearray()
+        while len(data) < n:
+            try:
+                packet = sock.recv(n - len(data))
+                if not packet:
+                    return None
+                data.extend(packet)
+            except socket.error as e:
+                print(f"Socket error: {e}")
+                return None
+        return data
 
     def get_opponent_frame(self):
         """Get the most recent opponent frame"""
@@ -130,6 +162,11 @@ class NetworkClient:
         """Check if game is running on server"""
         with self.lock:
             return self.game_running
+
+    def get_players_connected(self):
+        """Get the number of players connected to the server"""
+        with self.lock:
+            return self.players_connected
 
     def disconnect(self):
         """Disconnect from the server"""
