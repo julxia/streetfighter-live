@@ -1,15 +1,21 @@
 # import Player
 from recognition.models import RecognitionModels
 
+# Multiplayer Changes
+import time
+
 
 class GameLogic:
-    def __init__(self):
+    def __init__(self, multiplayer_client=None):
         # This gets the speech up and running. As well as initalizes the other variables
         # to access when the read() method is called.
         self.gameState = "start"
         self.gameMode = "menu"
         self.models = RecognitionModels()
         self.isSinglePlayer = None
+
+        # Multiplayer Changes
+        self.multiplayer_client = multiplayer_client  # Store the network client
 
         # Get speech recognition model started and running
         self.models.start("voice")
@@ -23,6 +29,12 @@ class GameLogic:
         # self.poseReady = False
         # self.speechReady = False
 
+        # Multiplayer Changes
+        self.player_health = 100
+        self.opponent_health = 100
+        self.last_attack_time = 0
+        self.attack_cooldown = 0.5  # Seconds between attacks
+
     def start(self):
         self.gameState = "running"
         # Start gesture recognition and do not continue until the model is setup
@@ -30,6 +42,11 @@ class GameLogic:
         self.models.start("pose")
         while not (self.models.is_initialized("pose")):
             continue
+
+        # Multiplayer Changes
+        # Reset health for new game
+        self.player_health = 100
+        self.opponent_health = 100
 
     # def initialize(self):
     #     pass
@@ -40,9 +57,18 @@ class GameLogic:
     def get_frame(self):
         return self.models.get_frame()
 
+    # Multiplayer Changes
+    def get_opponent_frame(self):
+        if self.multiplayer_client and not self.isSinglePlayer:
+            return self.multiplayer_client.get_opponent_frame()
+
+        return None
+
     def read(self):
         voice_output = self.models.get_output("voice")
         pose_output = self.models.get_output("pose")
+        # Multiplayer Changes
+        current_time = time.time()
 
         if voice_output.output:
             print(">> Voice output: ", voice_output)
@@ -51,25 +77,72 @@ class GameLogic:
         if voice_output.output and self.gameState == "start":
             if voice_output.output == "Single Player":
                 self.isSinglePlayer = True
+                # Multiplayer Changes
+                return True  # Single player selected
             elif voice_output.output == "Multiplayer":
-                self.isSinglePlayer = False
+                # Multiplayer Changes
+                if self.multiplayer_client:
+                    if self.multiplayer_client.connect():
+                        self.isSinglePlayer = False
+                        return False  # Multiplayer selected and connected
+                    else:
+                        print(f"Failed to connect to multiplayer server")
+                        return None
+                else:
+                    print(f"Multiplayer client not initialized")
+                    return None
             else:
-                self.isSinglePlayer = None
-            return self.isSinglePlayer
+                return None
 
         # 2. For getting inputs while the game is running in single player
+        # Multiplayer Changes
         if pose_output and self.gameState == "running":
             if voice_output.output == "exit":
                 return {"state": "terminate"}
-            return {
+
+            attack_result = {
                 "state": self.gameState,
                 "AttackType": pose_output.output,
             }
+
+            # In multiplayer mode, send current action to server
+            if not self.isSinglePlayer and self.multiplayer_client:
+                if (
+                    pose_output.output
+                    and current_time - self.last_attack_time > self.attack_cooldown
+                ):
+                    self.last_attack_time = current_time
+
+                    # Send current frame and action to server
+                    self.multiplayer_client.send_data(attack_result, self.get_frame())
+
+                    # Update health values from server
+                    self.player_health, self.opponent_health = (
+                        self.multiplayer_client.get_health()
+                    )
+
+                    # Add health info to result
+                    attack_result["player_health"] = self.player_health
+                    attack_result["opponent_health"] = self.opponent_health
+                else:
+                    # Send just the frame for synchronization when not attacking
+                    self.multiplayer_client.send_data(None, self.get_frame())
+
+                # Check opponent's action
+                opponent_action = self.multiplayer_client.get_opponent_action()
+                if opponent_action:
+                    attack_result["opponent_action"] = opponent_action
+
+            return attack_result
 
     def terminate(self):
         # Shut down Hao's pose model and update gameState to start
         self.models.stop("pose")
         self.gameState = "start"
+
+        # Multiplayer Changes
+        if self.multiplayer_client and not self.isSinglePlayer:
+            self.multiplayer_client.disconnect()
 
     # def initiateSinglePlayer(self):
     #     self.gameMode = "single"
