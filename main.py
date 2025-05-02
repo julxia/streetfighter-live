@@ -9,6 +9,10 @@ import cv2
 from backend.GameLogic import GameLogic
 from multiplayer.network_client import NetworkClient
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 pygame.init()
 FPS = 60
 SCREEN_WIDTH = 1440
@@ -39,7 +43,7 @@ class Game:
 
         # Multiplayer Changes
         # Initialize network client for multiplayer
-        self.network = NetworkClient()
+        self.network = NetworkClient(host=os.getenv("IPV4_ADDR"))
 
         # initialize backend game
         self.backend = GameLogic(multiplayer_client=self.network)
