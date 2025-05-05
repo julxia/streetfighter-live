@@ -407,111 +407,209 @@ class PoseRecognition:
             cv2.destroyAllWindows()
 
     def _run_loop(self):
-        """Main processing loop"""
+        """Main processing loop with optimized landmark processing"""
+        last_processed_time = 0
+        processing_interval = 1 / 30  # Process at most 30 frames per second
+        skip_frames_count = 0
+
+        # Track system load
+        system_load = 0
+
+        # Create a simplified connection set for faster drawing
+        # Only connections relevant for gesture detection
+        simplified_connections = [
+            (11, 13),
+            (13, 15),  # Left arm
+            (12, 14),
+            (14, 16),  # Right arm
+            (23, 25),
+            (25, 27),  # Left leg
+            (24, 26),
+            (26, 28),  # Right leg
+        ]
 
         while self.is_running and self.cap.isOpened():
+            current_time = time.time()
+
+            # Adaptive frame skipping based on system load
+            should_process = current_time - last_processed_time >= processing_interval
+
             success, image = self.cap.read()
             if not success:
                 print("Failed to read from webcam.")
                 break
 
-            # Flip the image horizontally for a selfie-view display
+            # Store original image flipped horizontally
             image = cv2.flip(image, 1)
-            self.current_frame = image
+            self.current_frame = image.copy()
 
-            # Convert the image to RGB and process it
-            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
+            # Process frame only when needed
+            if should_process:
+                skip_frames_count = 0
+                last_processed_time = current_time
 
-            # Get timestamp for the frame
-            frame_timestamp_ms = int(time.time() * 1000)
+                process_start_time = time.time()
 
-            # Process the frame asynchronously
-            self.landmarker.detect_async(mp_image, frame_timestamp_ms)
+                # Convert the image to RGB and process it
+                image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
 
-            # Draw landmarks if result is available
-            if (
-                self.pose_callback.result
-                and self.pose_callback.result.pose_landmarks
-                and self.display_landmarks
-            ):
-                # Draw pose landmarks using the Mediapipe solution draw method
-                for idx, landmarks in enumerate(
-                    self.pose_callback.result.pose_landmarks
-                ):
-                    # Convert landmarks to proto format for drawing
-                    landmark_list = landmark_pb2.NormalizedLandmarkList()
+                # Process the frame asynchronously
+                frame_timestamp_ms = int(current_time * 1000)
+                self.landmarker.detect_async(mp_image, frame_timestamp_ms)
 
-                    for landmark in landmarks:
-                        landmark_proto = landmark_pb2.NormalizedLandmark()
-                        landmark_proto.x = landmark.x
-                        landmark_proto.y = landmark.y
-                        landmark_proto.z = landmark.z
-                        if hasattr(landmark, "visibility"):
-                            landmark_proto.visibility = landmark.visibility
-                        landmark_list.landmark.append(landmark_proto)
+                # Create a copy of the image for drawing only if needed
+                if self.display_camera:
+                    display_img = image.copy()
 
-                    # Draw the landmarks
-                    self.mp_drawing.draw_landmarks(
-                        image,
-                        landmark_list,
-                        self.mp_pose.POSE_CONNECTIONS,
-                        landmark_drawing_spec=self.mp_drawing_styles.get_default_pose_landmarks_style(),
-                    )
+                    # Draw landmarks if we have a result and display is enabled
+                    if (
+                        self.pose_callback.result
+                        and self.pose_callback.result.pose_landmarks
+                        and self.display_landmarks
+                    ):
 
-            # Calculate FPS
-            self.frame_count += 1
-            elapsed_time = time.time() - self.start_time
-            if elapsed_time >= 1.0:
-                self.fps = self.frame_count / elapsed_time
-                self.frame_count = 0
-                self.start_time = time.time()
+                        for landmarks in self.pose_callback.result.pose_landmarks:
+                            # Draw only important landmarks manually for better performance
+                            # Key points for gesture recognition
+                            key_points = [
+                                11,
+                                12,
+                                13,
+                                14,
+                                15,
+                                16,
+                                23,
+                                24,
+                                25,
+                                26,
+                                27,
+                                28,
+                            ]
 
-            # Display FPS and gesture info
-            if self.display_camera:
-                cv2.putText(
-                    image,
-                    f"FPS: {self.fps:.1f}",
-                    (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1,
-                    (0, 255, 0),
-                    2,
-                )
+                            # Draw key landmarks (larger and more visible)
+                            for idx in key_points:
+                                if idx < len(landmarks):  # Check if the index is valid
+                                    lm = landmarks[idx]
+                                    h, w, c = display_img.shape
+                                    cx, cy = int(lm.x * w), int(lm.y * h)
+                                    # Draw important landmarks bigger
+                                    cv2.circle(
+                                        display_img, (cx, cy), 5, (0, 255, 0), -1
+                                    )
 
-                # Display current gesture and confidence
-                if self.pose_callback.detected_gesture:
-                    gesture_text = f"{self.pose_callback.detected_gesture}: {self.pose_callback.gesture_confidence:.2f}"
+                            # Draw simplified connections manually
+                            for connection in simplified_connections:
+                                start_idx, end_idx = connection
+                                if start_idx < len(landmarks) and end_idx < len(
+                                    landmarks
+                                ):
+                                    start_point = landmarks[start_idx]
+                                    end_point = landmarks[end_idx]
+
+                                    h, w, c = display_img.shape
+                                    start_x, start_y = int(start_point.x * w), int(
+                                        start_point.y * h
+                                    )
+                                    end_x, end_y = int(end_point.x * w), int(
+                                        end_point.y * h
+                                    )
+
+                                    cv2.line(
+                                        display_img,
+                                        (start_x, start_y),
+                                        (end_x, end_y),
+                                        (0, 255, 0),
+                                        2,
+                                    )
+
+                    # Calculate and display FPS
+                    self.frame_count += 1
+                    elapsed_time = current_time - self.start_time
+                    if elapsed_time >= 1.0:
+                        self.fps = self.frame_count / elapsed_time
+                        self.frame_count = 0
+                        self.start_time = current_time
+
+                    # Display FPS and gesture info
                     cv2.putText(
-                        image,
-                        gesture_text,
-                        (10, 70),
+                        display_img,
+                        f"FPS: {self.fps:.1f}",
+                        (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         1,
-                        (0, 0, 255),
+                        (0, 255, 0),
                         2,
                     )
 
-                # Display instructions
-                cv2.putText(
-                    image,
-                    "Gestures: Punch, Kick, Block",
-                    (10, image.shape[0] - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (255, 255, 255),
-                    1,
-                )
+                    # Display current gesture and confidence
+                    if self.pose_callback.detected_gesture:
+                        gesture_text = f"{self.pose_callback.detected_gesture}: {self.pose_callback.gesture_confidence:.2f}"
+                        cv2.putText(
+                            display_img,
+                            gesture_text,
+                            (10, 70),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            1,
+                            (0, 0, 255),
+                            2,
+                        )
 
-                # Show the image
-                cv2.imshow("Pose Recognition", image)
+                    # Display skipped frames
+                    if skip_frames_count > 0:
+                        cv2.putText(
+                            display_img,
+                            f"Skipped: {skip_frames_count}",
+                            (10, 110),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.7,
+                            (255, 165, 0),
+                            2,
+                        )
 
-                # Exit on 'q' key press
-                if cv2.waitKey(5) & 0xFF == ord("q"):
-                    self.is_running = False
-                    break
+                    # Display instructions
+                    cv2.putText(
+                        display_img,
+                        "Gestures: Punch, Kick, Block",
+                        (10, display_img.shape[0] - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5,
+                        (255, 255, 255),
+                        1,
+                    )
 
-            self.processed_frame = image
+                    # Show the image
+                    cv2.imshow("Pose Recognition", display_img)
+
+                    # Store the processed frame
+                    self.processed_frame = display_img
+
+                # Calculate processing time for this frame
+                process_end_time = time.time()
+                frame_process_time = process_end_time - process_start_time
+
+                # Update system load average (EMA - exponential moving average)
+                system_load = 0.7 * system_load + 0.3 * frame_process_time
+
+                # Adjust the processing interval based on system load
+                if system_load > 0.03:  # If processing takes > 30ms
+                    processing_interval = min(
+                        0.1, system_load * 1.5
+                    )  # Cap at 10 FPS min
+                else:
+                    processing_interval = 1 / 30  # Try to maintain 30 FPS
+            else:
+                # Count skipped frames for monitoring
+                skip_frames_count += 1
+
+            # Exit on 'q' key press
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                self.is_running = False
+                break
+
+            # Small sleep to prevent CPU overuse when not processing
+            if not should_process:
+                time.sleep(0.001)
 
     def get_current_frame(self):
         """Get the current camera frame"""
