@@ -34,6 +34,7 @@ class GameLogic:
         self.opponent_health = 100
         self.last_attack_time = 0
         self.attack_cooldown = 0.5  # Seconds between attacks
+        self.is_winner = False
 
     def start(self):
         self.gameState = "running"
@@ -114,7 +115,7 @@ class GameLogic:
                     and current_time - self.last_attack_time > self.attack_cooldown
                 ):
                     self.last_attack_time = current_time
- 
+
                     # Send current frame and action to server
                     self.multiplayer_client.send_data(attack_result, self.get_frame())
 
@@ -127,9 +128,11 @@ class GameLogic:
                     attack_result["player_health"] = self.player_health
                     attack_result["opponent_health"] = self.opponent_health
 
-                    # End game if either player reaches 0 HP. 
+                    # End game if either player reaches 0 HP.
                     if self.player_health <= 0 or self.opponent_health <= 0:
-                        return {"state": "terminate"}
+                        if self.opponent_health <= 0:
+                            self.is_winner = True
+                        return {"state": "terminate", "winner": self.is_winner}
                 else:
                     # Send just the frame for synchronization when not attacking
                     self.multiplayer_client.send_data(None, self.get_frame())

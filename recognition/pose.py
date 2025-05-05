@@ -82,10 +82,10 @@ class GestureRecognizer:
         # Determine which type of punch and confidence
         if jab_confidence > cross_confidence:
             if jab_confidence > 0.5:  # Threshold
-                return True, jab_confidence, "JAB"
+                return True, jab_confidence, "punch"
         else:
             if cross_confidence > 0.5:  # Threshold
-                return True, cross_confidence, "CROSS"
+                return True, cross_confidence, "punch"
 
         return False, 0.0, None
 
