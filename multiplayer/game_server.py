@@ -258,8 +258,10 @@ class GameServer:
         self.player_health[defender_id] -= damage
 
         # Cap health at 0
-        if self.player_health[defender_id] < 0:
+        if self.player_health[defender_id] <= 0:
             self.player_health[defender_id] = 0
+            self.game_running = False
+
 
     def start_game(self):
         """Start the game when two players are connected"""
