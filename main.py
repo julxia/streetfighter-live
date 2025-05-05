@@ -304,7 +304,16 @@ class Game:
             self.screen.blit(self.punching_bag, self.punching_bag_rect)
 
             if frame is None:
-                print("Error: No Camera Initialized.")
+                pygame.draw.rect(
+                    self.screen, 
+                    (0, 0, 0), 
+                    pygame.Rect(SCREEN_WIDTH // 2, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT)
+                )
+
+
+                error_text = self.info_font.render("Error: No camera found", True, WHITE)
+                error_rect = error_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT // 2))
+                self.screen.blit(error_text, error_rect)
             else:  # CENTER THE CAMERA
                 h, w = frame.shape[:2]
                 target_aspect = (SCREEN_WIDTH / 2) / SCREEN_HEIGHT
