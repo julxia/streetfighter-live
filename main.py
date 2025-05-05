@@ -18,6 +18,7 @@ FPS = 60
 SCREEN_WIDTH = 1440
 SCREEN_HEIGHT = 900
 RED = (255, 0, 0)
+GREEN = (0, 255, 0)
 WHITE = (255, 255, 255)
 
 ATTACK_DISPLAY_DURATION = 1.0
@@ -30,6 +31,7 @@ RUNNING = "RUNNING"
 END = "END"
 
 ASSET_FOLDER_PATH = "assets"
+ATTACK_FOLDER_PATH = "assets/attacks"
 BACKGROUND_FOLDER_PATH = "assets/background"
 FONTS_FOLDER_PATH = "assets/fonts"
 OBJECTS_FOLDER_PATH = "assets/objects"
@@ -61,7 +63,7 @@ class Game:
         self.opponent_health = 100
 
         self.init_start_time = 0
-        self.init_duration = 2.0
+        self.init_duration = 5.0
 
         self.load_start_assets()
 
@@ -78,6 +80,23 @@ class Game:
             self.inital_bg = pygame.transform.scale(
                 self.inital_bg, (SCREEN_WIDTH, SCREEN_HEIGHT)
             )
+            self.initial_tutorial = pygame.image.load(
+                f"{OBJECTS_FOLDER_PATH}/tutorial.png"
+            )
+
+            tutorial_height = int(SCREEN_HEIGHT * 0.8)  # 60% of screen height
+            tutorial_width = int(
+                self.initial_tutorial.get_width()
+                * (tutorial_height / self.initial_tutorial.get_height())
+            )
+
+            self.initial_tutorial = pygame.transform.scale(
+                self.initial_tutorial, (tutorial_width, tutorial_height)
+            )
+
+            self.initial_tutorial_rect = self.initial_tutorial.get_rect(
+            center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+            )
 
             self.title_img = pygame.image.load(f"{ASSET_FOLDER_PATH}/title/title.png")
 
@@ -91,7 +110,7 @@ class Game:
                 (int(title_width * scale_factor), int(title_height * scale_factor)),
             )
             self.title_rect = self.title_img.get_rect(
-                center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+                center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT * 0.9)
             )
 
             self.title_y_pos = SCREEN_HEIGHT // 2
@@ -106,15 +125,37 @@ class Game:
             print(f"ERROR loading images: {e}")
             return
 
-    def initialize_game(self, singleplayer=True):
-        if singleplayer:
+    def load_frames_from_sprite_sheet(self, sheet_path, frame_width, frame_height, frame_count):
+        sprite_sheet = pygame.image.load(sheet_path).convert_alpha()
+        frames = []
+
+        for i in range(frame_count):
+            frame = sprite_sheet.subsurface(pygame.Rect(i * frame_width, 0, frame_width, frame_height))
+            frames.append(frame)
+
+        return frames
+
+    def setup_animation_helpers(self):
+        self.animation_timers = [0.5, 0.25, 0.25]
+        self.animation_start_times = {"player": None, "opponent": None}
+        self.current_animation_frames = {"player": 0, "opponent": 0}
+        self.last_attack_names = {"player": None, "opponent": None}
+
+    
+    def load_attacks(self):
+        self.kick_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/kick_sprite_sheet.png", 256, 256, 3)
+        self.punch_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/punch_sprite_sheet.png", 256, 256, 3)
+        self.hadouken_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/hadouken_sprite_sheet.png", 256, 256, 3)
+        self.fire_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/fire_sprite_sheet.png", 256, 256, 3)
+        self.lightning_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/lightning_sprite_sheet.png", 256, 256, 3)
+
+    def initialize_game(self):
+        self.load_attacks()
+        self.setup_animation_helpers()
+        if self.backend.isSinglePlayer:
             self.load_single_player_assets()
         else:
             self.load_multiplayer_assets()
-
-        # self.camera = cv2.VideoCapture(0)
-        # if not self.camera.isOpened():
-        #     raise RuntimeError(f"Could not open video capture device {0}")
 
         self.backend.start()
 
@@ -151,28 +192,109 @@ class Game:
         )
 
         # Health bar assets
-        self.health_bar_width = 300
-        self.health_bar_height = 30
-        self.health_bar_border = 2
+        self.health_bar_width = 500
+        self.health_bar_height = 50
+        self.health_bar_border = 10
+
+    def render_health_bars(self):
+        self.player_health, self.opponent_health = (
+            self.backend.multiplayer_client.get_health()
+        )
+
+        bar_x_offset = 50
+        bar_y = 50
+
+        def draw_health_bar(x, health_percent):
+            # Inner filled bar dimensions
+            health_width = int(self.health_bar_width * max(0, health_percent))
+            filled_rect = pygame.Rect(x, bar_y, health_width, self.health_bar_height)
+            background_rect = pygame.Rect(x, bar_y, self.health_bar_width, self.health_bar_height)
+
+            # Draw border (inflate creates a slightly bigger rect for the outline)
+            outline_rect = background_rect.inflate(self.health_bar_border * 2, self.health_bar_border * 2)
+            pygame.draw.rect(self.screen, WHITE, outline_rect)
+
+            # Draw background and foreground
+            pygame.draw.rect(self.screen, RED, background_rect)
+            pygame.draw.rect(self.screen, GREEN, filled_rect)
+
+        # Draw player bar (left)
+        player_health_percent = self.player_health / 100
+        draw_health_bar(bar_x_offset, player_health_percent)
+
+        # Draw opponent bar (right)
+        opponent_health_percent = self.opponent_health / 100
+        opponent_x = SCREEN_WIDTH - bar_x_offset - self.health_bar_width
+        draw_health_bar(opponent_x, opponent_health_percent)
+
 
     def render_start(self):
-
         self.screen.blit(self.start_bg, (0, 0))
         self.screen.blit(self.title_img, self.title_rect)
 
-        start_text = self.info_font.render(
-            "Say 'Single Player' to start the game", True, WHITE
+        start_text_1 = self.info_font.render(
+            "Say 'Single Player' or 'Multiplayer'", True, WHITE
         )
-        start_rect = start_text.get_rect(
-            center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT * 3.5 // 4)
+        start_rect_1 = start_text_1.get_rect(
+            center=(SCREEN_WIDTH // 2, 50)
         )
-        self.screen.blit(start_text, start_rect)
+
+        start_text_2 = self.info_font.render(
+            "to start the game!", True, WHITE
+        )
+        start_rect_2 = start_text_2.get_rect(
+            center=(SCREEN_WIDTH// 2, 90)
+        )
+
+        self.screen.blit(start_text_1, start_rect_1)
+        self.screen.blit(start_text_2, start_rect_2)
 
     def render_initialize(self):
         self.screen.blit(self.inital_bg, (0, 0))
-        init_text = self.info_font.render("Starting Single Player mode...", True, WHITE)
+        self.screen.blit(self.initial_tutorial, self.initial_tutorial_rect)
+        mode_type = 'Single Player' if self.backend.isSinglePlayer else 'Multiplayer'
+        dot_states = [".", "..", "..."]
+        elapsed = time.time() - self.init_start_time
+        dot_index = int(elapsed * 2) % len(dot_states)  # Change every 0.5s
+        dots = dot_states[dot_index]
+
+        init_text = self.info_font.render(f"Starting {mode_type} mode{dots}", True, WHITE)
         init_rect = init_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
         self.screen.blit(init_text, init_rect)
+
+    def render_attack_animation(self, animation_type, x, y, mirrored=False, is_opponent=False):
+        key = "opponent" if is_opponent else "player"
+        current_time = time.time()
+
+        # Use separate timers
+        timer = self.opponent_attack_timer if is_opponent else self.attack_timer
+
+        # Check if animation just started — reset animation if timer changed
+        if self.animation_start_times.get(key) is None or abs(current_time - timer) < 0.01:
+            self.animation_start_times[key] = current_time
+            self.current_animation_frames[key] = 0
+
+        elapsed = current_time - self.animation_start_times[key]
+        frame_durations = self.animation_timers
+
+        total_duration = 0
+        for i, duration in enumerate(frame_durations):
+            total_duration += duration
+            if elapsed < total_duration:
+                self.current_animation_frames[key] = i
+                break
+        else:
+            self.animation_start_times[key] = None
+            self.current_animation_frames[key] = 0
+            return
+
+        frames = getattr(self, f"{animation_type}_frames", [])
+        if frames and self.current_animation_frames[key] < len(frames):
+            frame = frames[self.current_animation_frames[key]]
+            if mirrored:
+                frame = pygame.transform.flip(frame, True, False)
+            self.screen.blit(frame, (x, y))
+
 
     def render_running(self, frame):
         # Multiplayer Changes
@@ -212,11 +334,16 @@ class Game:
             # Display attack text if we have one
             current_time = time.time()
             if self.attack and current_time < self.attack_timer:
-                attack_text = self.info_font.render(self.attack, True, WHITE)
-                attack_rect = attack_text.get_rect(
-                    center=(SCREEN_WIDTH // 4, SCREEN_HEIGHT * 3 // 4)
-                )
-                self.screen.blit(attack_text, attack_rect)
+                if self.attack == 'block':
+                    attack_text = self.info_font.render("blocking...", True, WHITE)
+                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3 // 4))
+                    self.screen.blit(attack_text, attack_rect)
+                else:
+                    attack_text = self.info_font.render(self.attack, True, WHITE)
+                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH // 4, SCREEN_HEIGHT * 3 // 4))
+                    self.screen.blit(attack_text, attack_rect)
+
+                    self.render_attack_animation(self.attack, SCREEN_WIDTH // 4 - 128, SCREEN_HEIGHT // 2 - 128)
         else:
             # Multiplayer Changes
             # Multiplayer rendering
@@ -268,51 +395,8 @@ class Game:
                 # Display opponent on right side
                 self.screen.blit(opponent_surface, (SCREEN_WIDTH // 2, 0))
 
-            # Draw health bars
-            self.player_health, self.opponent_health = (
-                self.backend.multiplayer_client.get_health()
-            )
 
-            # Player health bar (left side)
-            health_percent = max(0, self.player_health / 100)
-            pygame.draw.rect(
-                self.screen,
-                (255, 0, 0),
-                (50, 50, self.health_bar_width, self.health_bar_height),
-            )
-            pygame.draw.rect(
-                self.screen,
-                (0, 255, 0),
-                (
-                    50,
-                    50,
-                    int(self.health_bar_width * health_percent),
-                    self.health_bar_height,
-                ),
-            )
-
-            # Opponent health bar (right side)
-            health_percent = max(0, self.opponent_health / 100)
-            pygame.draw.rect(
-                self.screen,
-                (255, 0, 0),
-                (
-                    SCREEN_WIDTH - 50 - self.health_bar_width,
-                    50,
-                    self.health_bar_width,
-                    self.health_bar_height,
-                ),
-            )
-            pygame.draw.rect(
-                self.screen,
-                (0, 255, 0),
-                (
-                    SCREEN_WIDTH - 50 - self.health_bar_width,
-                    50,
-                    int(self.health_bar_width * health_percent),
-                    self.health_bar_height,
-                ),
-            )
+            self.render_health_bars()
 
             # Display attack text if we have one
             current_time = time.time()
@@ -325,12 +409,21 @@ class Game:
 
             # Display opponent attack if they performed one
             if self.opponent_attack and current_time < self.opponent_attack_timer:
-                opponent_text = self.info_font.render(self.opponent_attack, True, WHITE)
-                opponent_rect = opponent_text.get_rect(
-                    center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3 // 4)
-                )
-                self.screen.blit(opponent_text, opponent_rect)
+                if self.opponent_attack == "block":
+                    attack_text = self.info_font.render("blocking...", True, WHITE)
+                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH // 4, SCREEN_HEIGHT * 3 // 4))
+                else:
+                    opponent_text = self.info_font.render(self.opponent_attack, True, WHITE)
+                    opponent_rect = opponent_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3 // 4))
+                    self.screen.blit(opponent_text, opponent_rect)
 
+                    self.render_attack_animation(
+                        self.opponent_attack,
+                        SCREEN_WIDTH * 3 // 4 - 128,
+                        SCREEN_HEIGHT // 2 - 128,
+                        mirrored=True,
+                        is_opponent=True
+                    )
     def render_end(self):
         return NotImplementedError
 
@@ -351,16 +444,11 @@ class Game:
             # Game mode selection logic
             if self.state == START:
                 # Multiplayer Changes
-                if input is True:  # Single player
-                    self.state = INITIALIZE
-                    print("STARTING SINGLEPLAYER")
-                    self.initialize_game(True)
-                    self.init_start_time = time.time()
-                elif input is False:  # Multiplayer
-                    self.state = INITIALIZE
-                    print("STARTING MULTIPLAYER")
-                    self.initialize_game(False)
-                    self.init_start_time = time.time()
+                self.state = INITIALIZE
+                mode_type = 'SINGLE PLAYER' if input else 'MULTIPLAYER'
+                print(f"STARTING {mode_type}")
+                self.initialize_game()
+                self.init_start_time = time.time()
 
             # Game running logic
             elif self.state == RUNNING and input and "AttackType" in input:
@@ -399,6 +487,7 @@ class Game:
 
                 if self.state == START and event.key == pygame.K_SPACE:
                     self.state = INITIALIZE
+                    self.initialize_game(True)
                     self.init_start_time = time.time()
                 elif self.state == INITIALIZE and event.key == pygame.K_SPACE:
                     self.load_game_assets()
