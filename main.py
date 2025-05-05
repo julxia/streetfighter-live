@@ -20,6 +20,7 @@ SCREEN_HEIGHT = 900
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 WHITE = (255, 255, 255)
+LILAC = (230,215,255)
 
 ATTACK_DISPLAY_DURATION = 1.0
 
@@ -28,7 +29,7 @@ ATTACK_DISPLAY_DURATION = 1.0
 START = "START"
 INITIALIZE = "INITIALIZE"
 RUNNING = "RUNNING"
-END = "END"
+TERMINATE = "TERMINATE"
 
 ASSET_FOLDER_PATH = "assets"
 ATTACK_FOLDER_PATH = "assets/attacks"
@@ -64,7 +65,7 @@ class Game:
 
         self.init_start_time = 0
         self.init_duration = 5.0
-
+        self.winner = False
         self.load_start_assets()
 
     def load_start_assets(self):
@@ -84,7 +85,7 @@ class Game:
                 f"{OBJECTS_FOLDER_PATH}/tutorial.png"
             )
 
-            tutorial_height = int(SCREEN_HEIGHT * 0.8)  # 60% of screen height
+            tutorial_height = int(SCREEN_HEIGHT * 0.8)
             tutorial_width = int(
                 self.initial_tutorial.get_width()
                 * (tutorial_height / self.initial_tutorial.get_height())
@@ -233,14 +234,14 @@ class Game:
         self.screen.blit(self.title_img, self.title_rect)
 
         start_text_1 = self.info_font.render(
-            "Say 'Single Player' or 'Multiplayer'", True, WHITE
+            "Say 'Single Player' or 'Multiplayer'", True, LILAC
         )
         start_rect_1 = start_text_1.get_rect(
             center=(SCREEN_WIDTH // 2, 50)
         )
 
         start_text_2 = self.info_font.render(
-            "to start the game!", True, WHITE
+            "to start the game!", True, LILAC
         )
         start_rect_2 = start_text_2.get_rect(
             center=(SCREEN_WIDTH// 2, 90)
@@ -258,7 +259,7 @@ class Game:
         dot_index = int(elapsed * 2) % len(dot_states)  # Change every 0.5s
         dots = dot_states[dot_index]
 
-        init_text = self.info_font.render(f"Starting {mode_type} mode{dots}", True, WHITE)
+        init_text = self.info_font.render(f"Starting {mode_type} mode{dots}", True, LILAC)
         init_rect = init_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
         self.screen.blit(init_text, init_rect)
 
@@ -304,16 +305,17 @@ class Game:
             self.screen.blit(self.punching_bag, self.punching_bag_rect)
 
             if frame is None:
+                print("Error: No camera found")
                 pygame.draw.rect(
                     self.screen, 
                     (0, 0, 0), 
                     pygame.Rect(SCREEN_WIDTH // 2, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT)
                 )
 
-
                 error_text = self.info_font.render("Error: No camera found", True, WHITE)
                 error_rect = error_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT // 2))
                 self.screen.blit(error_text, error_rect)
+                
             else:  # CENTER THE CAMERA
                 h, w = frame.shape[:2]
                 target_aspect = (SCREEN_WIDTH / 2) / SCREEN_HEIGHT
@@ -434,7 +436,30 @@ class Game:
                         is_opponent=True
                     )
     def render_end(self):
-        return NotImplementedError
+        self.screen.blit(self.start_bg, (0, 0))
+
+        end_text_1 = self.info_font.render(
+            "THANK YOU FOR PLAYING STREETFIGHTER-LIVE!", True, LILAC
+        )
+        end_rect_1 = end_text_1.get_rect(
+            center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT * 0.8 // 2)
+        )
+        self.screen.blit(end_text_1, end_rect_1)
+
+        if self.winner is not None:
+            game_end_font = pygame.font.Font(
+                    f"{FONTS_FOLDER_PATH}/PressStart2P-Regular.ttf", 50
+                )
+            message = "You are the winner! :)" if self.winner else "You lost :("
+            end_text_2 = game_end_font.render(
+                message, True, WHITE
+            )
+            end_rect_2 = end_text_2.get_rect(
+                center=(SCREEN_WIDTH// 2, SCREEN_HEIGHT // 2)
+            )
+            self.screen.blit(end_text_2, end_rect_2)
+       
+        
 
     def render(self, frame):
         if self.state == START:
@@ -443,7 +468,7 @@ class Game:
             self.render_initialize()
         elif self.state == RUNNING:
             self.render_running(frame)
-        elif self.state == END:
+        elif self.state == TERMINATE:
             self.render_end()
 
     def handle_events(self, input):
@@ -459,8 +484,12 @@ class Game:
                 self.initialize_game()
                 self.init_start_time = time.time()
 
+            elif 'gamestate' in input and input['gamestate'] == 'terminate':
+                self.state = TERMINATE
+                self.winner = input['winner']
+
             # Game running logic
-            elif self.state == RUNNING and input and "AttackType" in input:
+            elif self.state == RUNNING and "AttackType" in input:
                 if self.attack is None or current_time >= self.attack_timer:
                     self.attack = input["AttackType"]
                     self.attack_timer = current_time + ATTACK_DISPLAY_DURATION
@@ -496,12 +525,10 @@ class Game:
 
                 if self.state == START and event.key == pygame.K_SPACE:
                     self.state = INITIALIZE
-                    self.initialize_game(True)
+                    self.initialize_game()
                     self.init_start_time = time.time()
-                elif self.state == INITIALIZE and event.key == pygame.K_SPACE:
-                    self.load_game_assets()
-                elif self.state == END and event.key == pygame.K_r:
-                    self.currentstate_state = START
+                elif self.state == RUNNING and event.key == pygame.K_q:
+                    self.state = TERMINATE
 
     def update(self):
         self.animation_time += 0.05
