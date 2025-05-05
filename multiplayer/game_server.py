@@ -247,9 +247,9 @@ class GameServer:
         damage = 0
         if attack_type and isinstance(attack_type, str):
             attack_lower = attack_type.lower()
-            if attack_lower == "punch":
+            if attack_lower in {"jab", "cross", "punch"}:
                 damage = 5
-            elif attack_lower == "kick":
+            elif attack_lower in {"left_kick", "right_kick"}:
                 damage = 7
             elif attack_lower == "block":
                 return  # No damage for blocks
