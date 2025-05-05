@@ -18,62 +18,130 @@ class GestureRecognizer:
         self.cooldown = 1.0  # Cooldown in seconds between gesture detections
 
     def detect_punch(self, pose_landmarks):
-        """Detect a punch gesture - right arm extended forward"""
+        """Detect a punch gesture - either jab (left arm extended) or cross (right arm extended)"""
         if not pose_landmarks:
-            return False, 0.0
+            return False, 0.0, None
 
-        # Get relevant landmarks
-        right_shoulder = pose_landmarks[12]  # Right shoulder
-        right_elbow = pose_landmarks[14]  # Right elbow
-        right_wrist = pose_landmarks[16]  # Right wrist
+        PUNCH_ARM_ANGLE = 130
 
-        # Check if arm is extended (elbow is extended)
-        elbow_angle = self._calculate_angle(right_shoulder, right_elbow, right_wrist)
+        # Get relevant landmarks for both arms
+        right_shoulder = pose_landmarks[11]  # Left shoulder
+        right_elbow = pose_landmarks[13]  # Left elbow
+        right_wrist = pose_landmarks[15]  # Left wrist
 
-        # Check if arm is forward (z-coordinate is negative, meaning towards camera)
-        arm_forward = right_wrist.z < right_elbow.z
+        left_shoulder = pose_landmarks[12]  # Right shoulder
+        left_elbow = pose_landmarks[14]  # Right elbow
+        left_wrist = pose_landmarks[16]  # Right wrist
 
-        # Calculate confidence based on how extended the arm is and how forward it is
-        angle_confidence = min(
-            1.0, max(0.0, (elbow_angle - 130) / 50)
-        )  # Normalize to 0-1 range
-        z_diff = right_elbow.z - right_wrist.z
-        forward_confidence = min(1.0, max(0.0, z_diff * 10))  # Scale z difference
+        # Check if either arm is extended
+        left_elbow_angle = self._calculate_angle(left_shoulder, left_elbow, left_wrist)
+        right_elbow_angle = self._calculate_angle(
+            right_shoulder, right_elbow, right_wrist
+        )
 
-        # Combined confidence
-        confidence = angle_confidence * 0.7 + forward_confidence * 0.3
+        # Check if arms are forward
+        left_arm_forward = left_wrist.z < left_elbow.z
+        right_arm_forward = right_wrist.z < right_elbow.z
 
-        return elbow_angle > 150 and arm_forward, confidence
+        # Check if other arm is in blocking position (bent elbow, ~90 degrees)
+        left_blocking = 70 < left_elbow_angle < 120
+        right_blocking = 70 < right_elbow_angle < 120
+
+        # Calculate confidence for each punch type
+        jab_confidence = 0.0
+        cross_confidence = 0.0
+
+        # JAB - left arm extended, right arm blocking
+        if left_elbow_angle > PUNCH_ARM_ANGLE and left_arm_forward and right_blocking:
+            angle_confidence = min(1.0, max(0.0, (left_elbow_angle - 130) / 50))
+            z_diff = left_elbow.z - left_wrist.z
+            forward_confidence = min(1.0, max(0.0, z_diff * 10))
+            block_confidence = min(
+                1.0, max(0.0, (1.0 - abs(right_elbow_angle - 90) / 30))
+            )
+            jab_confidence = (
+                angle_confidence * 0.5
+                + forward_confidence * 0.3
+                + block_confidence * 0.2
+            )
+
+        # CROSS - right arm extended, left arm blocking
+        if right_elbow_angle > PUNCH_ARM_ANGLE and right_arm_forward and left_blocking:
+            angle_confidence = min(1.0, max(0.0, (right_elbow_angle - 130) / 50))
+            z_diff = right_elbow.z - right_wrist.z
+            forward_confidence = min(1.0, max(0.0, z_diff * 10))
+            block_confidence = min(
+                1.0, max(0.0, (1.0 - abs(left_elbow_angle - 90) / 30))
+            )
+            cross_confidence = (
+                angle_confidence * 0.5
+                + forward_confidence * 0.3
+                + block_confidence * 0.2
+            )
+
+        # Determine which type of punch and confidence
+        if jab_confidence > cross_confidence:
+            if jab_confidence > 0.5:  # Threshold
+                return True, jab_confidence, "JAB"
+        else:
+            if cross_confidence > 0.5:  # Threshold
+                return True, cross_confidence, "CROSS"
+
+        return False, 0.0, None
 
     def detect_kick(self, pose_landmarks):
-        """Detect a kick gesture - leg extended forward"""
+        """Detect a kick gesture - either leg extended forward"""
         if not pose_landmarks:
-            return False, 0.0
+            return False, 0.0, None
 
-        # Get relevant landmarks
-        right_hip = pose_landmarks[24]  # Right hip
-        right_knee = pose_landmarks[26]  # Right knee
-        right_ankle = pose_landmarks[28]  # Right ankle
+        # Get relevant landmarks for right leg
+        left_hip = pose_landmarks[24]  # Right hip
+        left_knee = pose_landmarks[26]  # Right knee
+        left_ankle = pose_landmarks[28]  # Right ankle
 
-        # Check if leg is extended
-        knee_angle = self._calculate_angle(right_hip, right_knee, right_ankle)
+        # Get relevant landmarks for left leg
+        right_hip = pose_landmarks[23]  # Left hip
+        right_knee = pose_landmarks[25]  # Left knee
+        right_ankle = pose_landmarks[27]  # Left ankle
 
-        # Check if leg is raised (ankle is higher than knee)
-        leg_raised = right_ankle.y < right_knee.y
-        height_diff = right_knee.y - right_ankle.y
+        # Calculate angles for both legs
+        right_knee_angle = self._calculate_angle(right_hip, right_knee, right_ankle)
+        left_knee_angle = self._calculate_angle(left_hip, left_knee, left_ankle)
 
-        # Calculate confidence based on how extended the leg is and how high it's raised
-        angle_confidence = min(
-            1.0, max(0.0, (knee_angle - 130) / 50)
-        )  # Normalize to 0-1 range
-        height_confidence = min(
-            1.0, max(0.0, height_diff * 10)
-        )  # Scale height difference
+        # Check if either leg is raised (ankle is higher than knee)
+        right_leg_raised = right_ankle.y < right_knee.y
+        left_leg_raised = left_ankle.y < left_knee.y
 
-        # Combined confidence
-        confidence = angle_confidence * 0.6 + height_confidence * 0.4
+        # Calculate height difference for confidence calculation
+        right_height_diff = right_knee.y - right_ankle.y if right_leg_raised else 0
+        left_height_diff = left_knee.y - left_ankle.y if left_leg_raised else 0
 
-        return knee_angle > 150 and leg_raised, confidence
+        # Calculate confidence for right kick
+        right_angle_confidence = min(1.0, max(0.0, (right_knee_angle - 130) / 50))
+        right_height_confidence = min(1.0, max(0.0, right_height_diff * 10))
+        right_confidence = right_angle_confidence * 0.6 + right_height_confidence * 0.4
+
+        # Calculate confidence for left kick
+        left_angle_confidence = min(1.0, max(0.0, (left_knee_angle - 130) / 50))
+        left_height_confidence = min(1.0, max(0.0, left_height_diff * 10))
+        left_confidence = left_angle_confidence * 0.6 + left_height_confidence * 0.4
+
+        # Determine which leg is kicking (if any) based on confidence
+        is_right_kick = right_knee_angle > 150 and right_leg_raised
+        is_left_kick = left_knee_angle > 150 and left_leg_raised
+
+        # Return the kick with higher confidence
+        if is_right_kick and is_left_kick:
+            if right_confidence > left_confidence:
+                return True, right_confidence, "RIGHT_KICK"
+            else:
+                return True, left_confidence, "LEFT_KICK"
+        elif is_right_kick:
+            return True, right_confidence, "RIGHT_KICK"
+        elif is_left_kick:
+            return True, left_confidence, "LEFT_KICK"
+
+        return False, 0.0, None
 
     def detect_block(self, pose_landmarks):
         """Detect a block gesture - arms in front of body forming protection"""
@@ -149,9 +217,19 @@ class GestureRecognizer:
         """Detect a gesture from the given pose landmarks"""
         current_time = time.time()
 
+        # Clean up old timestamps (older than 10 seconds)
+        expired_gestures = []
+        for g, ts in self.gesture_timestamps.items():
+            if current_time - ts > 10.0:  # 10 seconds cleanup
+                expired_gestures.append(g)
+
+        # Remove expired gestures
+        for g in expired_gestures:
+            del self.gesture_timestamps[g]
+
         # Check for gestures with confidence
-        is_punch, punch_confidence = self.detect_punch(pose_landmarks)
-        is_kick, kick_confidence = self.detect_kick(pose_landmarks)
+        is_punch, punch_confidence, punch_type = self.detect_punch(pose_landmarks)
+        is_kick, kick_confidence, kick_type = self.detect_kick(pose_landmarks)
         is_block, block_confidence = self.detect_block(pose_landmarks)
 
         # Choose the gesture with highest confidence
@@ -159,11 +237,11 @@ class GestureRecognizer:
         confidence = 0.0
 
         if is_punch and punch_confidence > confidence:
-            gesture = "PUNCH"
+            gesture = punch_type  # Use specific punch type
             confidence = punch_confidence
 
         if is_kick and kick_confidence > confidence:
-            gesture = "KICK"
+            gesture = kick_type
             confidence = kick_confidence
 
         if is_block and block_confidence > confidence:
@@ -329,109 +407,209 @@ class PoseRecognition:
             cv2.destroyAllWindows()
 
     def _run_loop(self):
-        """Main processing loop"""
+        """Main processing loop with optimized landmark processing"""
+        last_processed_time = 0
+        processing_interval = 1 / 30  # Process at most 30 frames per second
+        skip_frames_count = 0
+
+        # Track system load
+        system_load = 0
+
+        # Create a simplified connection set for faster drawing
+        # Only connections relevant for gesture detection
+        simplified_connections = [
+            (11, 13),
+            (13, 15),  # Left arm
+            (12, 14),
+            (14, 16),  # Right arm
+            (23, 25),
+            (25, 27),  # Left leg
+            (24, 26),
+            (26, 28),  # Right leg
+        ]
+
         while self.is_running and self.cap.isOpened():
+            current_time = time.time()
+
+            # Adaptive frame skipping based on system load
+            should_process = current_time - last_processed_time >= processing_interval
+
             success, image = self.cap.read()
             if not success:
                 print("Failed to read from webcam.")
                 break
 
-            # Flip the image horizontally for a selfie-view display
+            # Store original image flipped horizontally
             image = cv2.flip(image, 1)
             self.current_frame = image.copy()
 
-            # Convert the image to RGB and process it
-            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
+            # Process frame only when needed
+            if should_process:
+                skip_frames_count = 0
+                last_processed_time = current_time
 
-            # Get timestamp for the frame
-            frame_timestamp_ms = int(time.time() * 1000)
+                process_start_time = time.time()
 
-            # Process the frame asynchronously
-            self.landmarker.detect_async(mp_image, frame_timestamp_ms)
+                # Convert the image to RGB and process it
+                image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
 
-            # Draw landmarks if result is available
-            if (
-                self.pose_callback.result
-                and self.pose_callback.result.pose_landmarks
-                and self.display_landmarks
-            ):
-                # Draw pose landmarks using the Mediapipe solution draw method
-                for idx, landmarks in enumerate(
-                    self.pose_callback.result.pose_landmarks
-                ):
-                    # Convert landmarks to proto format for drawing
-                    landmark_list = landmark_pb2.NormalizedLandmarkList()
-                    for landmark in landmarks:
-                        landmark_proto = landmark_pb2.NormalizedLandmark()
-                        landmark_proto.x = landmark.x
-                        landmark_proto.y = landmark.y
-                        landmark_proto.z = landmark.z
-                        if hasattr(landmark, "visibility"):
-                            landmark_proto.visibility = landmark.visibility
-                        landmark_list.landmark.append(landmark_proto)
+                # Process the frame asynchronously
+                frame_timestamp_ms = int(current_time * 1000)
+                self.landmarker.detect_async(mp_image, frame_timestamp_ms)
 
-                    # Draw the landmarks
-                    self.mp_drawing.draw_landmarks(
-                        image,
-                        landmark_list,
-                        self.mp_pose.POSE_CONNECTIONS,
-                        landmark_drawing_spec=self.mp_drawing_styles.get_default_pose_landmarks_style(),
-                    )
+                # Create a copy of the image for drawing only if needed
+                if self.display_camera:
+                    display_img = image.copy()
 
-            # Calculate FPS
-            self.frame_count += 1
-            elapsed_time = time.time() - self.start_time
-            if elapsed_time >= 1.0:
-                self.fps = self.frame_count / elapsed_time
-                self.frame_count = 0
-                self.start_time = time.time()
+                    # Draw landmarks if we have a result and display is enabled
+                    if (
+                        self.pose_callback.result
+                        and self.pose_callback.result.pose_landmarks
+                        and self.display_landmarks
+                    ):
 
-            # Display FPS and gesture info
-            if self.display_camera:
-                cv2.putText(
-                    image,
-                    f"FPS: {self.fps:.1f}",
-                    (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1,
-                    (0, 255, 0),
-                    2,
-                )
+                        for landmarks in self.pose_callback.result.pose_landmarks:
+                            # Draw only important landmarks manually for better performance
+                            # Key points for gesture recognition
+                            key_points = [
+                                11,
+                                12,
+                                13,
+                                14,
+                                15,
+                                16,
+                                23,
+                                24,
+                                25,
+                                26,
+                                27,
+                                28,
+                            ]
 
-                # Display current gesture and confidence
-                if self.pose_callback.detected_gesture:
-                    gesture_text = f"{self.pose_callback.detected_gesture}: {self.pose_callback.gesture_confidence:.2f}"
+                            # Draw key landmarks (larger and more visible)
+                            for idx in key_points:
+                                if idx < len(landmarks):  # Check if the index is valid
+                                    lm = landmarks[idx]
+                                    h, w, c = display_img.shape
+                                    cx, cy = int(lm.x * w), int(lm.y * h)
+                                    # Draw important landmarks bigger
+                                    cv2.circle(
+                                        display_img, (cx, cy), 5, (0, 255, 0), -1
+                                    )
+
+                            # Draw simplified connections manually
+                            for connection in simplified_connections:
+                                start_idx, end_idx = connection
+                                if start_idx < len(landmarks) and end_idx < len(
+                                    landmarks
+                                ):
+                                    start_point = landmarks[start_idx]
+                                    end_point = landmarks[end_idx]
+
+                                    h, w, c = display_img.shape
+                                    start_x, start_y = int(start_point.x * w), int(
+                                        start_point.y * h
+                                    )
+                                    end_x, end_y = int(end_point.x * w), int(
+                                        end_point.y * h
+                                    )
+
+                                    cv2.line(
+                                        display_img,
+                                        (start_x, start_y),
+                                        (end_x, end_y),
+                                        (0, 255, 0),
+                                        2,
+                                    )
+
+                    # Calculate and display FPS
+                    self.frame_count += 1
+                    elapsed_time = current_time - self.start_time
+                    if elapsed_time >= 1.0:
+                        self.fps = self.frame_count / elapsed_time
+                        self.frame_count = 0
+                        self.start_time = current_time
+
+                    # Display FPS and gesture info
                     cv2.putText(
-                        image,
-                        gesture_text,
-                        (10, 70),
+                        display_img,
+                        f"FPS: {self.fps:.1f}",
+                        (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         1,
-                        (0, 0, 255),
+                        (0, 255, 0),
                         2,
                     )
 
-                # Display instructions
-                cv2.putText(
-                    image,
-                    "Gestures: Punch, Kick, Block",
-                    (10, image.shape[0] - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (255, 255, 255),
-                    1,
-                )
+                    # Display current gesture and confidence
+                    if self.pose_callback.detected_gesture:
+                        gesture_text = f"{self.pose_callback.detected_gesture}: {self.pose_callback.gesture_confidence:.2f}"
+                        cv2.putText(
+                            display_img,
+                            gesture_text,
+                            (10, 70),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            1,
+                            (0, 0, 255),
+                            2,
+                        )
 
-                # Show the image
-                cv2.imshow("Pose Recognition", image)
+                    # Display skipped frames
+                    if skip_frames_count > 0:
+                        cv2.putText(
+                            display_img,
+                            f"Skipped: {skip_frames_count}",
+                            (10, 110),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.7,
+                            (255, 165, 0),
+                            2,
+                        )
 
-                # Exit on 'q' key press
-                if cv2.waitKey(5) & 0xFF == ord("q"):
-                    self.is_running = False
-                    break
+                    # Display instructions
+                    cv2.putText(
+                        display_img,
+                        "Gestures: Punch, Kick, Block",
+                        (10, display_img.shape[0] - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5,
+                        (255, 255, 255),
+                        1,
+                    )
 
-            self.processed_frame = image.copy()
+                    # Show the image
+                    cv2.imshow("Pose Recognition", display_img)
+
+                    # Store the processed frame
+                    self.processed_frame = display_img
+
+                # Calculate processing time for this frame
+                process_end_time = time.time()
+                frame_process_time = process_end_time - process_start_time
+
+                # Update system load average (EMA - exponential moving average)
+                system_load = 0.7 * system_load + 0.3 * frame_process_time
+
+                # Adjust the processing interval based on system load
+                if system_load > 0.03:  # If processing takes > 30ms
+                    processing_interval = min(
+                        0.1, system_load * 1.5
+                    )  # Cap at 10 FPS min
+                else:
+                    processing_interval = 1 / 30  # Try to maintain 30 FPS
+            else:
+                # Count skipped frames for monitoring
+                skip_frames_count += 1
+
+            # Exit on 'q' key press
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                self.is_running = False
+                break
+
+            # Small sleep to prevent CPU overuse when not processing
+            if not should_process:
+                time.sleep(0.001)
 
     def get_current_frame(self):
         """Get the current camera frame"""
