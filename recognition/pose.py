@@ -224,7 +224,7 @@ class PoseRecognition:
         camera_id=0,
         detection_confidence=0.5,
         tracking_confidence=0.5,
-        display_camera=True,
+        display_camera=False,
         display_landmarks=True,
     ):
         """

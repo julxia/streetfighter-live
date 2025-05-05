@@ -107,12 +107,14 @@ class GameLogic:
 
             # In multiplayer mode, send current action to server
             if not self.isSinglePlayer and self.multiplayer_client:
+                if voice_output.output == "exit":
+                    return {"state": "terminate"}
                 if (
                     pose_output.output
                     and current_time - self.last_attack_time > self.attack_cooldown
                 ):
                     self.last_attack_time = current_time
-
+ 
                     # Send current frame and action to server
                     self.multiplayer_client.send_data(attack_result, self.get_frame())
 
@@ -124,6 +126,10 @@ class GameLogic:
                     # Add health info to result
                     attack_result["player_health"] = self.player_health
                     attack_result["opponent_health"] = self.opponent_health
+
+                    # End game if either player reaches 0 HP. 
+                    if self.player_health <= 0 or self.opponent_health <= 0:
+                        return {"state": "terminate"}
                 else:
                     # Send just the frame for synchronization when not attacking
                     self.multiplayer_client.send_data(None, self.get_frame())
