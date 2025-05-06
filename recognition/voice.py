@@ -307,6 +307,10 @@ street_fighter_commands = [
     "Ice",
     "Pause",
     "Resume",
+    "Exit",
+    "Hadouken",
+    "Fire",
+    "Lightning",
     "Quit",
 ]
 

@@ -15,8 +15,23 @@ class GestureRecognizer:
         if not pose_landmarks:
             return False, 0.0, None
 
-        PUNCH_ARM_ANGLE = 130
-        MIN_VISIBILITY_THRESHOLD = 0.65
+        # Key tuning parameters - adjust these to control sensitivity
+        PUNCH_ARM_ANGLE = 120  # Min angle for extended arm (lower = more sensitive)
+        MIN_VISIBILITY = (
+            0.65  # Landmark visibility requirement (lower = more sensitive)
+        )
+        HIP_VISIBILITY = 0.3  # Hip visibility requirement (lower = more sensitive)
+        Z_THRESHOLD = 0.01  # How far forward wrist must be vs elbow (higher = stricter)
+        BLOCKING_MIN = 45  # Min angle for blocking arm (lower = more sensitive)
+        BLOCKING_MAX = 120  # Max angle for blocking arm (higher = more sensitive)
+        CONFIDENCE_THRESHOLD = (
+            0.6  # Final confidence threshold (lower = more sensitive)
+        )
+
+        # Confidence calculation weights - must sum to 1.0
+        ANGLE_WEIGHT = 0.5
+        FORWARD_WEIGHT = 0.3
+        BLOCK_WEIGHT = 0.2
 
         # Get relevant landmarks for both arms
         right_shoulder = pose_landmarks[11]  # Left shoulder
@@ -27,7 +42,7 @@ class GestureRecognizer:
         left_elbow = pose_landmarks[14]  # Right elbow
         left_wrist = pose_landmarks[16]  # Right wrist
 
-        # Check visibility of key points - abort if critical landmarks aren't visible enough
+        # Check visibility of key points
         key_landmarks = [
             right_shoulder,
             right_elbow,
@@ -36,70 +51,77 @@ class GestureRecognizer:
             left_elbow,
             left_wrist,
         ]
-        if any(lm.visibility < MIN_VISIBILITY_THRESHOLD for lm in key_landmarks):
+        if any(lm.visibility < MIN_VISIBILITY for lm in key_landmarks):
             return False, 0.0, None
 
-        # Check if body is sufficiently visible - require hip points to be detected
+        # Check if body is sufficiently visible
         left_hip = pose_landmarks[23]
         right_hip = pose_landmarks[24]
-        if left_hip.visibility < 0.3 and right_hip.visibility < 0.3:
+        if (
+            left_hip.visibility < HIP_VISIBILITY
+            and right_hip.visibility < HIP_VISIBILITY
+        ):
             return False, 0.0, None
 
-        # Check if either arm is extended
+        # Calculate arm angles
         left_elbow_angle = self._calculate_angle(left_shoulder, left_elbow, left_wrist)
         right_elbow_angle = self._calculate_angle(
             right_shoulder, right_elbow, right_wrist
         )
 
-        # Check if arms are forward with stricter z-coordinate difference threshold
-        left_arm_forward = left_wrist.z < left_elbow.z - 0.05
-        right_arm_forward = right_wrist.z < right_elbow.z - 0.05
+        # Check forward arm extension with threshold
+        left_arm_forward = left_wrist.z < (left_elbow.z - Z_THRESHOLD)
+        right_arm_forward = right_wrist.z < (right_elbow.z - Z_THRESHOLD)
 
-        # Check if other arm is in blocking position (bent elbow, ~90 degrees)
-        left_blocking = 70 < left_elbow_angle < 120
-        right_blocking = 70 < right_elbow_angle < 120
+        # Check blocking position
+        left_blocking = BLOCKING_MIN < left_elbow_angle < BLOCKING_MAX
+        right_blocking = BLOCKING_MIN < right_elbow_angle < BLOCKING_MAX
 
-        # Calculate confidence for each punch type
+        # Calculate punch confidences
         jab_confidence = 0.0
         cross_confidence = 0.0
 
-        # JAB - left arm extended, right arm blocking
+        # JAB calculation (left arm punch)
         if left_elbow_angle > PUNCH_ARM_ANGLE and left_arm_forward and right_blocking:
-            angle_confidence = min(1.0, max(0.0, (left_elbow_angle - 130) / 50))
+            angle_confidence = min(
+                1.0, max(0.0, (left_elbow_angle - PUNCH_ARM_ANGLE) / 50)
+            )
             z_diff = left_elbow.z - left_wrist.z
             forward_confidence = min(1.0, max(0.0, z_diff * 10))
             block_confidence = min(
                 1.0, max(0.0, (1.0 - abs(right_elbow_angle - 90) / 30))
             )
+
             jab_confidence = (
-                angle_confidence * 0.5
-                + forward_confidence * 0.3
-                + block_confidence * 0.2
+                angle_confidence * ANGLE_WEIGHT
+                + forward_confidence * FORWARD_WEIGHT
+                + block_confidence * BLOCK_WEIGHT
             )
 
-        # CROSS - right arm extended, left arm blocking
+        # CROSS calculation (right arm punch)
         if right_elbow_angle > PUNCH_ARM_ANGLE and right_arm_forward and left_blocking:
-            angle_confidence = min(1.0, max(0.0, (right_elbow_angle - 130) / 50))
+            angle_confidence = min(
+                1.0, max(0.0, (right_elbow_angle - PUNCH_ARM_ANGLE) / 50)
+            )
             z_diff = right_elbow.z - right_wrist.z
             forward_confidence = min(1.0, max(0.0, z_diff * 10))
             block_confidence = min(
                 1.0, max(0.0, (1.0 - abs(left_elbow_angle - 90) / 30))
             )
+
             cross_confidence = (
-                angle_confidence * 0.5
-                + forward_confidence * 0.3
-                + block_confidence * 0.2
+                angle_confidence * ANGLE_WEIGHT
+                + forward_confidence * FORWARD_WEIGHT
+                + block_confidence * BLOCK_WEIGHT
             )
 
-        confidence_threshold = 0.6
-
-        # Determine which type of punch and confidence
+        # Determine best punch and check threshold
         if jab_confidence > cross_confidence:
-            if jab_confidence > confidence_threshold:
-                return True, jab_confidence, "punch"
+            if jab_confidence > CONFIDENCE_THRESHOLD:
+                return True, jab_confidence, "JAB"
         else:
-            if cross_confidence > confidence_threshold:
-                return True, cross_confidence, "punch"
+            if cross_confidence > CONFIDENCE_THRESHOLD:
+                return True, cross_confidence, "CROSS"
 
         return False, 0.0, None
 
