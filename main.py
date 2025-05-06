@@ -65,7 +65,7 @@ class Game:
 
         self.init_start_time = 0
         self.init_duration = 5.0
-        self.winner = False
+        self.winner = None
         self.load_start_assets()
 
     def load_start_assets(self):
@@ -153,7 +153,7 @@ class Game:
     def initialize_game(self):
         self.load_attacks()
         self.setup_animation_helpers()
-        if self.backend.isSinglePlayer:
+        if self.backend.isSinglePlayer or self.backend.isSinglePlayer == None:
             self.load_single_player_assets()
         else:
             self.load_multiplayer_assets()
@@ -253,7 +253,7 @@ class Game:
     def render_initialize(self):
         self.screen.blit(self.inital_bg, (0, 0))
         self.screen.blit(self.initial_tutorial, self.initial_tutorial_rect)
-        mode_type = 'Single Player' if self.backend.isSinglePlayer else 'Multiplayer'
+        mode_type = 'Single Player' if (self.backend.isSinglePlayer or self.backend.isSinglePlayer == None) else 'Multiplayer'
         dot_states = [".", "..", "..."]
         elapsed = time.time() - self.init_start_time
         dot_index = int(elapsed * 2) % len(dot_states)  # Change every 0.5s
@@ -299,7 +299,7 @@ class Game:
 
     def render_running(self, frame):
         # Multiplayer Changes
-        if self.backend.isSinglePlayer:
+        if self.backend.isSinglePlayer or self.backend.isSinglePlayer == None:
             # Single player rendering
             self.screen.blit(self.running_bg, (0, 0))
             self.screen.blit(self.punching_bag, self.punching_bag_rect)
@@ -487,6 +487,7 @@ class Game:
             elif 'gamestate' in input and input['gamestate'] == 'terminate':
                 self.state = TERMINATE
                 self.winner = input['winner']
+                self.backend.terminate()
 
             # Game running logic
             elif self.state == RUNNING and "AttackType" in input:
@@ -495,7 +496,7 @@ class Game:
                     self.attack_timer = current_time + ATTACK_DISPLAY_DURATION
 
                 # Process health updates in multiplayer
-                if not self.backend.isSinglePlayer:
+                if self.backend.isSinglePlayer == False:
                     if "player_health" in input:
                         self.player_health = input["player_health"]
                     if "opponent_health" in input:
