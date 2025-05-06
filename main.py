@@ -164,7 +164,7 @@ class Game:
     def load_attacks(self):
         self.kick_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/kick_sprite_sheet.png", 256, 256, 3)
         self.punch_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/punch_sprite_sheet.png", 256, 256, 3)
-        self.hadouken_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/hadouken_sprite_sheet.png", 256, 256, 3)
+        self.ice_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/ice_sprite_sheet.png", 256, 256, 3)
         self.fire_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/fire_sprite_sheet.png", 256, 256, 3)
         self.lightning_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/lightning_sprite_sheet.png", 256, 256, 3)
 
