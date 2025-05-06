@@ -284,7 +284,7 @@ class GameServer:
                 elif attack_lower in {"lightning", "fire", "ice"}:
                     damage = 10
                 elif attack_lower == "block":
-                    return  # No damage for blocks
+                    damage = 0
 
         # Apply damage to defender
         self.player_health[defender_id] -= damage
