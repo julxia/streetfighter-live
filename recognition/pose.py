@@ -228,8 +228,8 @@ class GestureRecognizer:
             del self.gesture_timestamps[g]
 
         # Check for gestures with confidence
-        is_punch, punch_confidence, punch_type = self.detect_punch(pose_landmarks)
-        is_kick, kick_confidence, kick_type = self.detect_kick(pose_landmarks)
+        is_punch, punch_confidence, _ = self.detect_punch(pose_landmarks)
+        is_kick, kick_confidence, _ = self.detect_kick(pose_landmarks)
         is_block, block_confidence = self.detect_block(pose_landmarks)
 
         # Choose the gesture with highest confidence
@@ -237,11 +237,11 @@ class GestureRecognizer:
         confidence = 0.0
 
         if is_punch and punch_confidence > confidence:
-            gesture = punch_type  # Use specific punch type
+            gesture = "PUNCH"
             confidence = punch_confidence
 
         if is_kick and kick_confidence > confidence:
-            gesture = kick_type
+            gesture = "KICK"
             confidence = kick_confidence
 
         if is_block and block_confidence > confidence:

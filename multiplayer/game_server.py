@@ -251,6 +251,8 @@ class GameServer:
                 damage = 5
             elif attack_lower in {"left_kick", "right_kick"}:
                 damage = 7
+            elif attack_lower in {"lightning", "hadouken", "fire"}:
+                damage = 5
             elif attack_lower == "block":
                 return  # No damage for blocks
 
