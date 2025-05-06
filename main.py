@@ -513,7 +513,7 @@ class Game:
                 self.initialize_game()
                 self.init_start_time = time.time()
 
-            elif 'gamestate' in input and input['gamestate'] == 'terminate':
+            elif 'state' in input and input['state'] == 'terminate':
                 self.state = TERMINATE
                 self.winner = input['winner']
                 self.backend.terminate()
