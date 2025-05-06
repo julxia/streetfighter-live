@@ -247,11 +247,11 @@ class GameServer:
         damage = 0
         if attack_type and isinstance(attack_type, str):
             attack_lower = attack_type.lower()
-            if attack_lower in {"jab", "cross", "punch"}:
+            if attack_lower == "punch":
                 damage = 5
-            elif attack_lower in {"left_kick", "right_kick"}:
+            elif attack_lower == "kick":
                 damage = 7
-            elif attack_lower in {"lightning", "hadouken", "fire"}:
+            elif attack_lower in {"lightning", "ice", "fire"}:
                 damage = 5
             elif attack_lower == "block":
                 return  # No damage for blocks
@@ -263,7 +263,6 @@ class GameServer:
         if self.player_health[defender_id] <= 0:
             self.player_health[defender_id] = 0
             self.game_running = False
-
 
     def start_game(self):
         """Start the game when two players are connected"""

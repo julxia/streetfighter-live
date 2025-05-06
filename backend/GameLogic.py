@@ -71,16 +71,18 @@ class GameLogic:
         # Multiplayer Changes
         current_time = time.time()
 
-        if voice_output.output:
+        voice_command = voice_output.output if voice_output.output else None
+
+        if voice_command:
             print(">> Voice output: ", voice_output)
 
         # 1. For starting the game in single or multi player game
-        if voice_output.output and self.gameState == "start":
-            if voice_output.output == "Single Player":
+        if voice_command and self.gameState == "start":
+            if voice_command == "Single Player":
                 self.isSinglePlayer = True
                 # Multiplayer Changes
                 return True  # Single player selected
-            elif voice_output.output == "Multiplayer":
+            elif voice_command == "Multiplayer":
                 # Multiplayer Changes
                 if self.multiplayer_client:
                     if self.multiplayer_client.connect():
@@ -97,52 +99,90 @@ class GameLogic:
 
         # 2. For getting inputs while the game is running in single player
         # Multiplayer Changes
-        if pose_output and self.gameState == "running":
-            if voice_output.output == "exit":
+        if self.gameState == "running":
+            # Handle voice commands for exiting the game
+            if voice_command and voice_command.lower() in {"exit", "quit"}:
                 return {"state": "terminate"}
 
-            attack_result = {
-                "state": self.gameState,
-                "AttackType": pose_output.output,
-            }
+            if voice_command and voice_command.lower() in {"fire", "lightning", "ice"}:
+                special_move = voice_command.lower()
 
-            # In multiplayer mode, send current action to server
-            if not self.isSinglePlayer and self.multiplayer_client:
-                if voice_output.output == "exit":
-                    return {"state": "terminate"}
-                if (
-                    pose_output.output
-                    and current_time - self.last_attack_time > self.attack_cooldown
-                ):
-                    self.last_attack_time = current_time
+                attack_result = {
+                    "state": self.gameState,
+                    "AttackType": "punch",
+                }
 
-                    # Send current frame and action to server
-                    self.multiplayer_client.send_data(attack_result, self.get_frame())
+                # In multiplayer mode, send current action to server
+                if not self.isSinglePlayer and self.multiplayer_client:
+                    if current_time - self.last_attack_time > self.attack_cooldown:
+                        self.last_attack_time = current_time
 
-                    # Update health values from server
-                    self.player_health, self.opponent_health = (
-                        self.multiplayer_client.get_health()
-                    )
+                        # Send current frame and action to server
+                        self.multiplayer_client.send_data(
+                            attack_result, self.get_frame()
+                        )
 
-                    # Add health info to result
-                    attack_result["player_health"] = self.player_health
-                    attack_result["opponent_health"] = self.opponent_health
+                        # Update health values from server
+                        self.player_health, self.opponent_health = (
+                            self.multiplayer_client.get_health()
+                        )
 
-                    # End game if either player reaches 0 HP.
-                    if self.player_health <= 0 or self.opponent_health <= 0:
-                        if self.opponent_health <= 0:
-                            self.is_winner = True
-                        return {"state": "terminate", "winner": self.is_winner}
-                else:
-                    # Send just the frame for synchronization when not attacking
-                    self.multiplayer_client.send_data(None, self.get_frame())
+                        # Add health info to result
+                        attack_result["player_health"] = self.player_health
+                        attack_result["opponent_health"] = self.opponent_health
 
-                # Check opponent's action
-                opponent_action = self.multiplayer_client.get_opponent_action()
-                if opponent_action:
-                    attack_result["opponent_action"] = opponent_action
+                        # End game if either player reaches 0 HP.
+                        if self.player_health <= 0 or self.opponent_health <= 0:
+                            if self.opponent_health <= 0:
+                                self.is_winner = True
+                            return {"state": "terminate", "winner": self.is_winner}
 
-            return attack_result
+                return attack_result
+
+            # Handle pose outputs
+            if pose_output:
+                attack_result = {
+                    "state": self.gameState,
+                    "AttackType": pose_output.output,
+                }
+
+                # In multiplayer mode, send current action to server
+                if not self.isSinglePlayer and self.multiplayer_client:
+                    if (
+                        pose_output.output
+                        and current_time - self.last_attack_time > self.attack_cooldown
+                    ):
+                        self.last_attack_time = current_time
+
+                        # Send current frame and action to server
+                        self.multiplayer_client.send_data(
+                            attack_result, self.get_frame()
+                        )
+
+                        # Update health values from server
+                        self.player_health, self.opponent_health = (
+                            self.multiplayer_client.get_health()
+                        )
+
+                        # Add health info to result
+                        attack_result["player_health"] = self.player_health
+                        attack_result["opponent_health"] = self.opponent_health
+
+                        # End game if either player reaches 0 HP.
+                        if self.player_health <= 0 or self.opponent_health <= 0:
+                            if self.opponent_health <= 0:
+                                self.is_winner = True
+                            return {"state": "terminate", "winner": self.is_winner}
+                    else:
+                        # Send just the frame for synchronization when not attacking
+                        self.multiplayer_client.send_data(None, self.get_frame())
+
+                    # Check opponent's action
+                    opponent_action = self.multiplayer_client.get_opponent_action()
+                    if opponent_action:
+                        attack_result["opponent_action"] = opponent_action
+
+                return attack_result
 
     def terminate(self):
         # Shut down Hao's pose model and update gameState to start
