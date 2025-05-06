@@ -515,7 +515,7 @@ class Game:
 
             elif 'state' in input and input['state'] == 'terminate':
                 self.state = TERMINATE
-                self.winner = input['winner']
+                self.winner = input['winner'] if 'winner' in input else None
                 self.backend.terminate()
 
             elif self.state == RUNNING and "AttackType" in input:
