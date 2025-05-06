@@ -243,18 +243,43 @@ class GameServer:
         while len(self.player_health) <= max(attacker_id, defender_id):
             self.player_health.append(100)
 
+        # Check if defender is blocking
+        defender_is_blocking = False
+        if defender_id < len(self.client_actions) and self.client_actions[defender_id]:
+            defender_action = self.client_actions[defender_id]
+            if (
+                isinstance(defender_action, dict)
+                and defender_action.get("AttackType") == "block"
+            ):
+                defender_is_blocking = True
+
         # Define damage for different attack types
         damage = 0
         if attack_type and isinstance(attack_type, str):
             attack_lower = attack_type.lower()
-            if attack_lower == "punch":
-                damage = 5
-            elif attack_lower == "kick":
-                damage = 7
-            elif attack_lower in {"lightning", "ice", "fire"}:
-                damage = 5
-            elif attack_lower == "block":
-                return  # No damage for blocks
+
+            # If defender is blocking, check attack type
+            if defender_is_blocking:
+                # Block completely negates punch and kick damage
+                if attack_lower in {
+                    "punch",
+                    "kick",
+                }:
+                    damage = 0  # No damage when blocking punches or kicks
+                else:
+                    # Special moves still do damage even when blocking (reduced)
+                    if attack_lower in {"lightning", "fire", "ice"}:
+                        damage = 3  # Reduced damage for special moves
+            else:
+                # Normal damage when not blocking
+                if attack_lower == "punch":
+                    damage = 5
+                elif attack_lower == "kick":
+                    damage = 7
+                elif attack_lower in {"lightning", "fire", "ice"}:
+                    damage = 10
+                elif attack_lower == "block":
+                    return  # No damage for blocks
 
         # Apply damage to defender
         self.player_health[defender_id] -= damage
