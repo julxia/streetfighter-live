@@ -24,6 +24,7 @@ class GameServer:
         self.threads = []
         self.next_client_id = 0  # Track the next available client ID
         self.client_ids = {}  # Map client sockets to their IDs
+        self.defender_is_blocking = False
 
         # Register cleanup handlers
         atexit.register(self.cleanup)
@@ -244,14 +245,18 @@ class GameServer:
             self.player_health.append(100)
 
         # Check if defender is blocking
-        defender_is_blocking = False
         if defender_id < len(self.client_actions) and self.client_actions[defender_id]:
             defender_action = self.client_actions[defender_id]
             if (
                 isinstance(defender_action, dict)
                 and defender_action.get("AttackType") == "block"
             ):
-                defender_is_blocking = True
+                self.defender_is_blocking = True
+            elif (
+                isinstance(defender_action, dict)
+                and defender_action.get("AttackType") != "block"
+            ):
+                self.defender_is_blocking = False
 
         # Define damage for different attack types
         damage = 0
@@ -259,7 +264,7 @@ class GameServer:
             attack_lower = attack_type.lower()
 
             # If defender is blocking, check attack type
-            if defender_is_blocking:
+            if self.defender_is_blocking:
                 # Block completely negates punch and kick damage
                 if attack_lower in {
                     "punch",
