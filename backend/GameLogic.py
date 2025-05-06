@@ -109,7 +109,7 @@ class GameLogic:
 
                 attack_result = {
                     "state": self.gameState,
-                    "AttackType": "punch",
+                    "AttackType": special_move,
                 }
 
                 # In multiplayer mode, send current action to server
