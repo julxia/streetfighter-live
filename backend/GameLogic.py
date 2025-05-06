@@ -133,9 +133,10 @@ class GameLogic:
 
                         # End game if either player reaches 0 HP.
                         if self.player_health <= 0 or self.opponent_health <= 0:
-                            if self.opponent_health <= 0:
-                                self.is_winner = True
-                            return {"state": "terminate", "winner": self.is_winner}
+                            return {
+                                "state": "terminate",
+                                "winner": self.opponent_health <= 0,
+                            }
 
                 return attack_result
 
@@ -170,9 +171,10 @@ class GameLogic:
 
                         # End game if either player reaches 0 HP.
                         if self.player_health <= 0 or self.opponent_health <= 0:
-                            if self.opponent_health <= 0:
-                                self.is_winner = True
-                            return {"state": "terminate", "winner": self.is_winner}
+                            return {
+                                "state": "terminate",
+                                "winner": self.opponent_health <= 0,
+                            }
                     else:
                         # Send just the frame for synchronization when not attacking
                         self.multiplayer_client.send_data(None, self.get_frame())
