@@ -416,7 +416,7 @@ class Game:
                     player_surface, (SCREEN_WIDTH // 2, SCREEN_HEIGHT)
                 )
 
-                self.screen.blit(player_surface, (0, 0))
+                self.screen.blit(player_surface, (SCREEN_WIDTH // 2, 0))
 
             opponent_frame = self.backend.get_opponent_frame()
             if opponent_frame is not None:
@@ -431,17 +431,24 @@ class Game:
                     opponent_surface, (SCREEN_WIDTH // 2, SCREEN_HEIGHT)
                 )
 
-                self.screen.blit(opponent_surface, (SCREEN_WIDTH // 2, 0))
+                self.screen.blit(opponent_surface, (0, 0))
 
             self.render_health_bars()
 
             current_time = time.time()
+            
             if self.attack and current_time < self.attack_timer:
-                attack_text = self.info_font.render(self.attack, True, WHITE)
-                attack_rect = attack_text.get_rect(
-                    center=(SCREEN_WIDTH // 4, SCREEN_HEIGHT * 3 // 4)
-                )
-                self.screen.blit(attack_text, attack_rect)
+                if self.attack == 'block':
+                    attack_text = self.info_font.render("blocking...", True, WHITE)
+                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3 // 4))
+                    self.screen.blit(attack_text, attack_rect)
+                else:
+                    attack_text = self.info_font.render(self.attack, True, WHITE)
+                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH // 4, SCREEN_HEIGHT * 3 // 4))
+                    self.screen.blit(attack_text, attack_rect)
+
+                    self.render_attack_animation(self.attack, SCREEN_WIDTH // 4 - 128, SCREEN_HEIGHT // 2 - 128)
+                    self.play_attack_sound(self.attack)
 
             if self.opponent_attack and current_time < self.opponent_attack_timer:
                 if self.opponent_attack == "block":
