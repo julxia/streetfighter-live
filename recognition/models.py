@@ -1,7 +1,7 @@
 from typing import Literal
 
 from recognition.model_types import ModelOutput
-from recognition.pose import PoseRecognition
+from recognition.pose.pose_recognition import PoseRecognition
 from recognition.voice import VoiceRecognition, speech_callback, street_fighter_commands
 
 
@@ -25,7 +25,7 @@ class RecognitionModels:
         }
 
     def start(self, model: Literal["pose", "voice"]) -> None:
-        
+
         self.models[model].start()
 
     def stop(self, model: Literal["pose", "voice"]) -> None:
@@ -36,6 +36,6 @@ class RecognitionModels:
 
     def is_initialized(self, model: Literal["pose", "voice"]) -> bool:
         return self.models[model].is_initialized()
-    
+
     def get_frame(self):
-        return self.models['pose'].get_current_frame()
+        return self.models["pose"].get_current_frame()
