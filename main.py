@@ -71,7 +71,7 @@ class Game:
         self.opponent_health = 100
 
         self.init_start_time = 0
-        self.init_duration = 5.0
+        self.init_duration = 7.0
         self.winner = None
 
         self.load_start_assets()
@@ -130,6 +130,7 @@ class Game:
                 )
             except:
                 self.info_font = pygame.font.Font(None, 18)
+
         except pygame.error as e:
             print(f"ERROR loading images: {e}")
             return
@@ -260,10 +261,11 @@ class Game:
             pygame.draw.rect(self.screen, GREEN, filled_rect)
 
         player_health_percent = self.player_health / 100
-        draw_health_bar(bar_x_offset, player_health_percent)
+        player_bar_x = SCREEN_WIDTH - bar_x_offset - self.health_bar_width
+        draw_health_bar(player_bar_x, player_health_percent)
 
         opponent_health_percent = self.opponent_health / 100
-        opponent_x = SCREEN_WIDTH - bar_x_offset - self.health_bar_width
+        opponent_x = bar_x_offset
         draw_health_bar(opponent_x, opponent_health_percent)
 
 
@@ -300,6 +302,14 @@ class Game:
         init_text = self.info_font.render(f"Starting {mode_type} mode{dots}", True, LILAC)
         init_rect = init_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
         self.screen.blit(init_text, init_rect)
+
+
+        small_txt = pygame.font.Font(
+                    f"{FONTS_FOLDER_PATH}/PressStart2P-Regular.ttf", 20
+                )
+        info_txt = small_txt.render(f"You can say 'exit' to end the game", True, WHITE)
+        info_rect = info_txt.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 50))
+        self.screen.blit(info_txt, info_rect)
 
     def render_attack_animation(self, animation_type, x, y, mirrored=False, is_opponent=False):
         key = "opponent" if is_opponent else "player"
