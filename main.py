@@ -1,5 +1,4 @@
 import pygame
-import pygame.camera
 import sys
 import os
 import math
@@ -8,12 +7,12 @@ import numpy as np
 import cv2
 from backend.GameLogic import GameLogic
 from multiplayer.network_client import NetworkClient
-
 from dotenv import load_dotenv
 
 load_dotenv()
-
 pygame.init()
+pygame.mixer.init()
+
 FPS = 60
 SCREEN_WIDTH = 1440
 SCREEN_HEIGHT = 900
@@ -32,10 +31,11 @@ RUNNING = "RUNNING"
 TERMINATE = "TERMINATE"
 
 ASSET_FOLDER_PATH = "assets"
-ATTACK_FOLDER_PATH = "assets/attacks"
-BACKGROUND_FOLDER_PATH = "assets/background"
-FONTS_FOLDER_PATH = "assets/fonts"
-OBJECTS_FOLDER_PATH = "assets/objects"
+ATTACK_FOLDER_PATH = f"{ASSET_FOLDER_PATH}/attacks"
+BACKGROUND_FOLDER_PATH = f"{ASSET_FOLDER_PATH}/background"
+FONTS_FOLDER_PATH = f"{ASSET_FOLDER_PATH}/fonts"
+OBJECTS_FOLDER_PATH = f"{ASSET_FOLDER_PATH}/objects"
+MUSIC_FOLDER_PATH = f"{ASSET_FOLDER_PATH}/music"
 
 
 class Game:
@@ -44,8 +44,17 @@ class Game:
         pygame.display.set_caption("StreetFighterLIVE")
         self.clock = pygame.time.Clock()
 
-        # Multiplayer Changes
-        # Initialize network client for multiplayer
+        self.music_paths = {
+            "general": f"{MUSIC_FOLDER_PATH}/general.mp3",
+            "singleplayer": f"{MUSIC_FOLDER_PATH}/singleplayer.mp3",
+            "multiplayer": f"{MUSIC_FOLDER_PATH}/multiplayer.mp3",
+        }
+        self.current_music = None 
+        self.attack_sounds = {}
+        self.attack_channels = {}
+        self.attack_restore_time = None 
+
+        # network client for multiplayer
         self.network = NetworkClient(host=os.getenv("IPV4_ADDR"))
 
         # initialize backend game
@@ -53,19 +62,18 @@ class Game:
         self.state = START
         self.attack_timer = 0
         self.attack = None
-        # Multiplayer Changes
+
+        # Multiplayer
         self.opponent_attack = None
         self.opponent_attack_timer = 0
         self.info_font = None
-
-        # Multiplayer Changes
-        # Health bars
         self.player_health = 100
         self.opponent_health = 100
 
         self.init_start_time = 0
         self.init_duration = 5.0
         self.winner = None
+
         self.load_start_assets()
 
     def load_start_assets(self):
@@ -142,6 +150,16 @@ class Game:
         self.current_animation_frames = {"player": 0, "opponent": 0}
         self.last_attack_names = {"player": None, "opponent": None}
 
+    def play_music(self, key, fadeout_ms=1000, fadein_ms=1000):
+        if self.current_music == key:
+            return 
+
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.fadeout(fadeout_ms)
+
+        pygame.mixer.music.load(self.music_paths[key])
+        pygame.mixer.music.play(-1, fade_ms=fadein_ms)
+        self.current_music = key
     
     def load_attacks(self):
         self.kick_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/kick_sprite_sheet.png", 256, 256, 3)
@@ -149,6 +167,33 @@ class Game:
         self.hadouken_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/hadouken_sprite_sheet.png", 256, 256, 3)
         self.fire_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/fire_sprite_sheet.png", 256, 256, 3)
         self.lightning_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/lightning_sprite_sheet.png", 256, 256, 3)
+
+        sound_paths = {
+            "punch": f"{MUSIC_FOLDER_PATH}/punch.mp3",
+            "kick": f"{MUSIC_FOLDER_PATH}/kick.mp3",
+            "fire": f"{MUSIC_FOLDER_PATH}/fire.mp3",
+            "ice": f"{MUSIC_FOLDER_PATH}/ice.mp3",
+            "lightning": f"{MUSIC_FOLDER_PATH}/lightning.mp3",
+        }
+
+        for name, path in sound_paths.items():
+            self.attack_sounds[name] = pygame.mixer.Sound(path)
+
+    def play_attack_sound(self, attack_type):
+        if attack_type not in self.attack_sounds:
+            return
+
+        sound = self.attack_sounds[attack_type]
+
+        if attack_type not in self.attack_channels:
+            self.attack_channels[attack_type] = pygame.mixer.find_channel()
+
+        channel = self.attack_channels[attack_type]
+
+        if channel and not channel.get_busy():
+            pygame.mixer.music.set_volume(0.3)
+            channel.play(sound)
+        self.attack_restore_time = time.time() + sound.get_length()
 
     def initialize_game(self):
         self.load_attacks()
@@ -169,7 +214,7 @@ class Game:
 
         self.punching_bag = pygame.image.load(f"{OBJECTS_FOLDER_PATH}/punching_bag.png")
 
-        punching_bag_height = int(SCREEN_HEIGHT * 0.6)  # 60% of screen height
+        punching_bag_height = int(SCREEN_HEIGHT * 0.6) 
         punching_bag_width = int(
             self.punching_bag.get_width()
             * (punching_bag_height / self.punching_bag.get_height())
@@ -179,20 +224,17 @@ class Game:
             self.punching_bag, (punching_bag_width, punching_bag_height)
         )
 
-        # Position it on the left side of the screen
         self.punching_bag_rect = self.punching_bag.get_rect(
             center=(SCREEN_WIDTH // 4, SCREEN_HEIGHT // 2)
         )
 
     def load_multiplayer_assets(self):
-        # Multiplayer Changes
         self.running_bg = pygame.image.load(f"{ASSET_FOLDER_PATH}/background/gym.jpg")
 
         self.running_bg = pygame.transform.scale(
             self.running_bg, (SCREEN_WIDTH, SCREEN_HEIGHT)
         )
 
-        # Health bar assets
         self.health_bar_width = 500
         self.health_bar_height = 50
         self.health_bar_border = 10
@@ -206,24 +248,20 @@ class Game:
         bar_y = 50
 
         def draw_health_bar(x, health_percent):
-            # Inner filled bar dimensions
+
             health_width = int(self.health_bar_width * max(0, health_percent))
             filled_rect = pygame.Rect(x, bar_y, health_width, self.health_bar_height)
             background_rect = pygame.Rect(x, bar_y, self.health_bar_width, self.health_bar_height)
 
-            # Draw border (inflate creates a slightly bigger rect for the outline)
             outline_rect = background_rect.inflate(self.health_bar_border * 2, self.health_bar_border * 2)
             pygame.draw.rect(self.screen, WHITE, outline_rect)
 
-            # Draw background and foreground
             pygame.draw.rect(self.screen, RED, background_rect)
             pygame.draw.rect(self.screen, GREEN, filled_rect)
 
-        # Draw player bar (left)
         player_health_percent = self.player_health / 100
         draw_health_bar(bar_x_offset, player_health_percent)
 
-        # Draw opponent bar (right)
         opponent_health_percent = self.opponent_health / 100
         opponent_x = SCREEN_WIDTH - bar_x_offset - self.health_bar_width
         draw_health_bar(opponent_x, opponent_health_percent)
@@ -256,7 +294,7 @@ class Game:
         mode_type = 'Single Player' if (self.backend.isSinglePlayer or self.backend.isSinglePlayer == None) else 'Multiplayer'
         dot_states = [".", "..", "..."]
         elapsed = time.time() - self.init_start_time
-        dot_index = int(elapsed * 2) % len(dot_states)  # Change every 0.5s
+        dot_index = int(elapsed * 2) % len(dot_states) 
         dots = dot_states[dot_index]
 
         init_text = self.info_font.render(f"Starting {mode_type} mode{dots}", True, LILAC)
@@ -267,10 +305,8 @@ class Game:
         key = "opponent" if is_opponent else "player"
         current_time = time.time()
 
-        # Use separate timers
         timer = self.opponent_attack_timer if is_opponent else self.attack_timer
 
-        # Check if animation just started — reset animation if timer changed
         if self.animation_start_times.get(key) is None or abs(current_time - timer) < 0.01:
             self.animation_start_times[key] = current_time
             self.current_animation_frames[key] = 0
@@ -298,9 +334,7 @@ class Game:
 
 
     def render_running(self, frame):
-        # Multiplayer Changes
         if self.backend.isSinglePlayer or self.backend.isSinglePlayer == None:
-            # Single player rendering
             self.screen.blit(self.running_bg, (0, 0))
             self.screen.blit(self.punching_bag, self.punching_bag_rect)
 
@@ -316,7 +350,7 @@ class Game:
                 error_rect = error_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT // 2))
                 self.screen.blit(error_text, error_rect)
                 
-            else:  # CENTER THE CAMERA
+            else:  # CENTER CAMERA
                 h, w = frame.shape[:2]
                 target_aspect = (SCREEN_WIDTH / 2) / SCREEN_HEIGHT
 
@@ -342,7 +376,6 @@ class Game:
 
                 self.screen.blit(surface, (SCREEN_WIDTH // 2, 0))
 
-            # Display attack text if we have one
             current_time = time.time()
             if self.attack and current_time < self.attack_timer:
                 if self.attack == 'block':
@@ -355,14 +388,11 @@ class Game:
                     self.screen.blit(attack_text, attack_rect)
 
                     self.render_attack_animation(self.attack, SCREEN_WIDTH // 4 - 128, SCREEN_HEIGHT // 2 - 128)
+                    self.play_attack_sound(self.attack)
         else:
-            # Multiplayer Changes
-            # Multiplayer rendering
             self.screen.blit(self.running_bg, (0, 0))
 
-            # Process and display player frame
             if frame is not None:
-                # Process player frame
                 h, w = frame.shape[:2]
                 target_aspect = (SCREEN_WIDTH / 2) / SCREEN_HEIGHT
 
@@ -386,10 +416,8 @@ class Game:
                     player_surface, (SCREEN_WIDTH // 2, SCREEN_HEIGHT)
                 )
 
-                # Display player on left side
                 self.screen.blit(player_surface, (0, 0))
 
-            # Get and display opponent frame
             opponent_frame = self.backend.get_opponent_frame()
             if opponent_frame is not None:
                 opponent_frame_rgb = cv2.cvtColor(opponent_frame, cv2.COLOR_BGR2RGB)
@@ -403,13 +431,10 @@ class Game:
                     opponent_surface, (SCREEN_WIDTH // 2, SCREEN_HEIGHT)
                 )
 
-                # Display opponent on right side
                 self.screen.blit(opponent_surface, (SCREEN_WIDTH // 2, 0))
-
 
             self.render_health_bars()
 
-            # Display attack text if we have one
             current_time = time.time()
             if self.attack and current_time < self.attack_timer:
                 attack_text = self.info_font.render(self.attack, True, WHITE)
@@ -418,7 +443,6 @@ class Game:
                 )
                 self.screen.blit(attack_text, attack_rect)
 
-            # Display opponent attack if they performed one
             if self.opponent_attack and current_time < self.opponent_attack_timer:
                 if self.opponent_attack == "block":
                     attack_text = self.info_font.render("blocking...", True, WHITE)
@@ -475,9 +499,7 @@ class Game:
         current_time = time.time()
 
         if input != None:
-            # Game mode selection logic
             if self.state == START:
-                # Multiplayer Changes
                 self.state = INITIALIZE
                 mode_type = 'SINGLE PLAYER' if input else 'MULTIPLAYER'
                 print(f"STARTING {mode_type}")
@@ -489,20 +511,17 @@ class Game:
                 self.winner = input['winner']
                 self.backend.terminate()
 
-            # Game running logic
             elif self.state == RUNNING and "AttackType" in input:
                 if self.attack is None or current_time >= self.attack_timer:
                     self.attack = input["AttackType"]
                     self.attack_timer = current_time + ATTACK_DISPLAY_DURATION
 
-                # Process health updates in multiplayer
                 if self.backend.isSinglePlayer == False:
                     if "player_health" in input:
                         self.player_health = input["player_health"]
                     if "opponent_health" in input:
                         self.opponent_health = input["opponent_health"]
 
-                # Process opponent action
                 if "opponent_action" in input and input["opponent_action"]:
                     opponent_action = input["opponent_action"]
                     if (
@@ -529,6 +548,7 @@ class Game:
                     self.initialize_game()
                     self.init_start_time = time.time()
                 elif self.state == RUNNING and event.key == pygame.K_q:
+                    self.backend.terminate()
                     self.state = TERMINATE
 
     def update(self):
@@ -547,6 +567,18 @@ class Game:
 
         if self.attack and current_time >= self.attack_timer:
             self.attack = None
+            
+        if self.attack_restore_time and time.time() > self.attack_restore_time:
+            pygame.mixer.music.set_volume(1.0)
+            self.attack_restore_time = None
+            
+        if self.state in [START, INITIALIZE, TERMINATE]:
+            self.play_music("general")
+        elif self.state == RUNNING:
+            if self.backend.isSinglePlayer:
+                self.play_music("singleplayer")
+            else:
+                self.play_music("multiplayer")
 
     def run(self):
         while True:
