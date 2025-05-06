@@ -274,7 +274,7 @@ class Game:
         self.screen.blit(self.title_img, self.title_rect)
 
         start_text_1 = self.info_font.render(
-            "Say 'Single Player' or 'Multiplayer'", True, LILAC
+            "INFO: Say 'Single Player' or 'Multiplayer'", True, LILAC
         )
         start_rect_1 = start_text_1.get_rect(
             center=(SCREEN_WIDTH // 2, 50)
@@ -307,8 +307,8 @@ class Game:
         small_txt = pygame.font.Font(
                     f"{FONTS_FOLDER_PATH}/PressStart2P-Regular.ttf", 20
                 )
-        info_txt = small_txt.render(f"You can say 'exit' to end the game", True, WHITE)
-        info_rect = info_txt.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 50))
+        info_txt = small_txt.render(f"INFO: You can say 'exit' to end the game", True, WHITE)
+        info_rect = info_txt.get_rect(center=(SCREEN_WIDTH // 2, 50))
         self.screen.blit(info_txt, info_rect)
 
     def render_attack_animation(self, animation_type, x, y, mirrored=False, is_opponent=False):
@@ -390,7 +390,7 @@ class Game:
             if self.attack and current_time < self.attack_timer:
                 if self.attack == 'block':
                     attack_text = self.info_font.render("blocking...", True, WHITE)
-                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3 // 4))
+                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3.5 // 4))
                     self.screen.blit(attack_text, attack_rect)
                 else:
                     attack_text = self.info_font.render(self.attack, True, WHITE)
@@ -450,7 +450,7 @@ class Game:
             if self.attack and current_time < self.attack_timer:
                 if self.attack == 'block':
                     attack_text = self.info_font.render("blocking...", True, WHITE)
-                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3 // 4))
+                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3.5 // 4))
                     self.screen.blit(attack_text, attack_rect)
                 else:
                     attack_text = self.info_font.render(self.attack, True, WHITE)
@@ -463,7 +463,7 @@ class Game:
             if self.opponent_attack and current_time < self.opponent_attack_timer:
                 if self.opponent_attack == "block":
                     attack_text = self.info_font.render("blocking...", True, WHITE)
-                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH // 4, SCREEN_HEIGHT * 3 // 4))
+                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH // 4, SCREEN_HEIGHT * 3.5 // 4))
                 else:
                     opponent_text = self.info_font.render(self.opponent_attack, True, WHITE)
                     opponent_rect = opponent_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3 // 4))
@@ -499,7 +499,35 @@ class Game:
                 center=(SCREEN_WIDTH// 2, SCREEN_HEIGHT // 2)
             )
             self.screen.blit(end_text_2, end_rect_2)
-       
+
+        end_text_3 = self.info_font.render(
+            "INFO: Press R to restart the game!", True, WHITE
+        )
+        end_rect_3 = end_text_3.get_rect(
+            center=(SCREEN_WIDTH // 2, 50)
+        )
+        self.screen.blit(end_text_3, end_rect_3)
+    
+    def restart_game(self):
+        self.attack_restore_time = None 
+
+        # network client for multiplayer
+        self.network = NetworkClient(host=os.getenv("IPV4_ADDR"))
+
+        # initialize backend game
+        self.backend = GameLogic(multiplayer_client=self.network)
+        self.state = START
+        self.attack_timer = 0
+        self.attack = None
+
+        # Multiplayer
+        self.opponent_attack = None
+        self.opponent_attack_timer = 0
+        self.player_health = 100
+        self.opponent_health = 100
+
+        self.init_start_time = 0
+        self.winner = None
         
 
     def render(self, frame):
@@ -556,6 +584,8 @@ class Game:
                 sys.exit()
 
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r:
+                    self.restart_game()
                 if event.key == pygame.K_ESCAPE:
                     pygame.quit()
                     sys.exit()
