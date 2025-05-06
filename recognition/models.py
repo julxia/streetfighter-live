@@ -15,11 +15,11 @@ class RecognitionModels:
             "voice": VoiceRecognition(
                 callback_function=speech_callback,
                 phrases_to_detect=street_fighter_commands,
-                confidence_threshold=0.5,
+                confidence_threshold=0.4,
                 listening_timeout=3,
                 phrase_time_limit=2,
                 pause_after_no_speech=1.0,
-                energy_threshold=3500,
+                energy_threshold=2000,
                 dynamic_energy_adjustment=True,
             ),
         }
