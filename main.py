@@ -19,7 +19,7 @@ SCREEN_HEIGHT = 900
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 WHITE = (255, 255, 255)
-LILAC = (230,215,255)
+LILAC = (230, 215, 255)
 
 ATTACK_DISPLAY_DURATION = 1.0
 
@@ -49,10 +49,10 @@ class Game:
             "singleplayer": f"{MUSIC_FOLDER_PATH}/singleplayer.mp3",
             "multiplayer": f"{MUSIC_FOLDER_PATH}/multiplayer.mp3",
         }
-        self.current_music = None 
+        self.current_music = None
         self.attack_sounds = {}
         self.attack_channels = {}
-        self.attack_restore_time = None 
+        self.attack_restore_time = None
 
         # network client for multiplayer
         self.network = NetworkClient(host=os.getenv("IPV4_ADDR"))
@@ -104,7 +104,7 @@ class Game:
             )
 
             self.initial_tutorial_rect = self.initial_tutorial.get_rect(
-            center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+                center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
             )
 
             self.title_img = pygame.image.load(f"{ASSET_FOLDER_PATH}/title/title.png")
@@ -135,12 +135,16 @@ class Game:
             print(f"ERROR loading images: {e}")
             return
 
-    def load_frames_from_sprite_sheet(self, sheet_path, frame_width, frame_height, frame_count):
+    def load_frames_from_sprite_sheet(
+        self, sheet_path, frame_width, frame_height, frame_count
+    ):
         sprite_sheet = pygame.image.load(sheet_path).convert_alpha()
         frames = []
 
         for i in range(frame_count):
-            frame = sprite_sheet.subsurface(pygame.Rect(i * frame_width, 0, frame_width, frame_height))
+            frame = sprite_sheet.subsurface(
+                pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+            )
             frames.append(frame)
 
         return frames
@@ -153,7 +157,7 @@ class Game:
 
     def play_music(self, key, fadeout_ms=1000, fadein_ms=1000):
         if self.current_music == key:
-            return 
+            return
 
         if pygame.mixer.music.get_busy():
             pygame.mixer.music.fadeout(fadeout_ms)
@@ -161,13 +165,23 @@ class Game:
         pygame.mixer.music.load(self.music_paths[key])
         pygame.mixer.music.play(-1, fade_ms=fadein_ms)
         self.current_music = key
-    
+
     def load_attacks(self):
-        self.kick_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/kick_sprite_sheet.png", 256, 256, 3)
-        self.punch_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/punch_sprite_sheet.png", 256, 256, 3)
-        self.ice_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/ice_sprite_sheet.png", 256, 256, 3)
-        self.fire_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/fire_sprite_sheet.png", 256, 256, 3)
-        self.lightning_frames = self.load_frames_from_sprite_sheet(f"{ATTACK_FOLDER_PATH}/lightning_sprite_sheet.png", 256, 256, 3)
+        self.kick_frames = self.load_frames_from_sprite_sheet(
+            f"{ATTACK_FOLDER_PATH}/kick_sprite_sheet.png", 256, 256, 3
+        )
+        self.punch_frames = self.load_frames_from_sprite_sheet(
+            f"{ATTACK_FOLDER_PATH}/punch_sprite_sheet.png", 256, 256, 3
+        )
+        self.ice_frames = self.load_frames_from_sprite_sheet(
+            f"{ATTACK_FOLDER_PATH}/ice_sprite_sheet.png", 256, 256, 3
+        )
+        self.fire_frames = self.load_frames_from_sprite_sheet(
+            f"{ATTACK_FOLDER_PATH}/fire_sprite_sheet.png", 256, 256, 3
+        )
+        self.lightning_frames = self.load_frames_from_sprite_sheet(
+            f"{ATTACK_FOLDER_PATH}/lightning_sprite_sheet.png", 256, 256, 3
+        )
 
         sound_paths = {
             "punch": f"{MUSIC_FOLDER_PATH}/punch.mp3",
@@ -215,7 +229,7 @@ class Game:
 
         self.punching_bag = pygame.image.load(f"{OBJECTS_FOLDER_PATH}/punching_bag.png")
 
-        punching_bag_height = int(SCREEN_HEIGHT * 0.6) 
+        punching_bag_height = int(SCREEN_HEIGHT * 0.6)
         punching_bag_width = int(
             self.punching_bag.get_width()
             * (punching_bag_height / self.punching_bag.get_height())
@@ -252,9 +266,13 @@ class Game:
 
             health_width = int(self.health_bar_width * max(0, health_percent))
             filled_rect = pygame.Rect(x, bar_y, health_width, self.health_bar_height)
-            background_rect = pygame.Rect(x, bar_y, self.health_bar_width, self.health_bar_height)
+            background_rect = pygame.Rect(
+                x, bar_y, self.health_bar_width, self.health_bar_height
+            )
 
-            outline_rect = background_rect.inflate(self.health_bar_border * 2, self.health_bar_border * 2)
+            outline_rect = background_rect.inflate(
+                self.health_bar_border * 2, self.health_bar_border * 2
+            )
             pygame.draw.rect(self.screen, WHITE, outline_rect)
 
             pygame.draw.rect(self.screen, RED, background_rect)
@@ -268,7 +286,6 @@ class Game:
         opponent_x = bar_x_offset
         draw_health_bar(opponent_x, opponent_health_percent)
 
-
     def render_start(self):
         self.screen.blit(self.start_bg, (0, 0))
         self.screen.blit(self.title_img, self.title_rect)
@@ -276,16 +293,10 @@ class Game:
         start_text_1 = self.info_font.render(
             "INFO: Say 'Single Player' or 'Multiplayer'", True, LILAC
         )
-        start_rect_1 = start_text_1.get_rect(
-            center=(SCREEN_WIDTH // 2, 50)
-        )
+        start_rect_1 = start_text_1.get_rect(center=(SCREEN_WIDTH // 2, 50))
 
-        start_text_2 = self.info_font.render(
-            "to start the game!", True, LILAC
-        )
-        start_rect_2 = start_text_2.get_rect(
-            center=(SCREEN_WIDTH// 2, 90)
-        )
+        start_text_2 = self.info_font.render("to start the game!", True, LILAC)
+        start_rect_2 = start_text_2.get_rect(center=(SCREEN_WIDTH // 2, 90))
 
         self.screen.blit(start_text_1, start_rect_1)
         self.screen.blit(start_text_2, start_rect_2)
@@ -293,31 +304,43 @@ class Game:
     def render_initialize(self):
         self.screen.blit(self.inital_bg, (0, 0))
         self.screen.blit(self.initial_tutorial, self.initial_tutorial_rect)
-        mode_type = 'Single Player' if (self.backend.isSinglePlayer or self.backend.isSinglePlayer == None) else 'Multiplayer'
+        mode_type = (
+            "Single Player"
+            if (self.backend.isSinglePlayer or self.backend.isSinglePlayer == None)
+            else "Multiplayer"
+        )
         dot_states = [".", "..", "..."]
         elapsed = time.time() - self.init_start_time
-        dot_index = int(elapsed * 2) % len(dot_states) 
+        dot_index = int(elapsed * 2) % len(dot_states)
         dots = dot_states[dot_index]
 
-        init_text = self.info_font.render(f"Starting {mode_type} mode{dots}", True, LILAC)
+        init_text = self.info_font.render(
+            f"Starting {mode_type} mode{dots}", True, LILAC
+        )
         init_rect = init_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
         self.screen.blit(init_text, init_rect)
 
-
         small_txt = pygame.font.Font(
-                    f"{FONTS_FOLDER_PATH}/PressStart2P-Regular.ttf", 20
-                )
-        info_txt = small_txt.render(f"INFO: You can say 'exit' to end the game", True, WHITE)
+            f"{FONTS_FOLDER_PATH}/PressStart2P-Regular.ttf", 20
+        )
+        info_txt = small_txt.render(
+            f"INFO: You can say 'exit' to end the game", True, WHITE
+        )
         info_rect = info_txt.get_rect(center=(SCREEN_WIDTH // 2, 50))
         self.screen.blit(info_txt, info_rect)
 
-    def render_attack_animation(self, animation_type, x, y, mirrored=False, is_opponent=False):
+    def render_attack_animation(
+        self, animation_type, x, y, mirrored=False, is_opponent=False
+    ):
         key = "opponent" if is_opponent else "player"
         current_time = time.time()
 
         timer = self.opponent_attack_timer if is_opponent else self.attack_timer
 
-        if self.animation_start_times.get(key) is None or abs(current_time - timer) < 0.01:
+        if (
+            self.animation_start_times.get(key) is None
+            or abs(current_time - timer) < 0.01
+        ):
             self.animation_start_times[key] = current_time
             self.current_animation_frames[key] = 0
 
@@ -342,7 +365,6 @@ class Game:
                 frame = pygame.transform.flip(frame, True, False)
             self.screen.blit(frame, (x, y))
 
-
     def render_running(self, frame):
         if self.backend.isSinglePlayer or self.backend.isSinglePlayer == None:
             self.screen.blit(self.running_bg, (0, 0))
@@ -351,15 +373,19 @@ class Game:
             if frame is None:
                 print("Error: No camera found")
                 pygame.draw.rect(
-                    self.screen, 
-                    (0, 0, 0), 
-                    pygame.Rect(SCREEN_WIDTH // 2, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT)
+                    self.screen,
+                    (0, 0, 0),
+                    pygame.Rect(SCREEN_WIDTH // 2, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT),
                 )
 
-                error_text = self.info_font.render("Error: No camera found", True, WHITE)
-                error_rect = error_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT // 2))
+                error_text = self.info_font.render(
+                    "Error: No camera found", True, WHITE
+                )
+                error_rect = error_text.get_rect(
+                    center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT // 2)
+                )
                 self.screen.blit(error_text, error_rect)
-                
+
             else:  # CENTER CAMERA
                 h, w = frame.shape[:2]
                 target_aspect = (SCREEN_WIDTH / 2) / SCREEN_HEIGHT
@@ -388,16 +414,22 @@ class Game:
 
             current_time = time.time()
             if self.attack and current_time < self.attack_timer:
-                if self.attack == 'block':
+                if self.attack == "block":
                     attack_text = self.info_font.render("blocking...", True, WHITE)
-                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3.5 // 4))
+                    attack_rect = attack_text.get_rect(
+                        center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3.5 // 4)
+                    )
                     self.screen.blit(attack_text, attack_rect)
                 else:
                     attack_text = self.info_font.render(self.attack, True, WHITE)
-                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH // 4, SCREEN_HEIGHT * 3 // 4))
+                    attack_rect = attack_text.get_rect(
+                        center=(SCREEN_WIDTH // 4, SCREEN_HEIGHT * 3 // 4)
+                    )
                     self.screen.blit(attack_text, attack_rect)
 
-                    self.render_attack_animation(self.attack, SCREEN_WIDTH // 4 - 128, SCREEN_HEIGHT // 2 - 128)
+                    self.render_attack_animation(
+                        self.attack, SCREEN_WIDTH // 4 - 128, SCREEN_HEIGHT // 2 - 128
+                    )
                     self.play_attack_sound(self.attack)
         else:
             self.screen.blit(self.running_bg, (0, 0))
@@ -446,27 +478,39 @@ class Game:
             self.render_health_bars()
 
             current_time = time.time()
-            
+
             if self.attack and current_time < self.attack_timer:
-                if self.attack == 'block':
+                if self.attack == "block":
                     attack_text = self.info_font.render("blocking...", True, WHITE)
-                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3.5 // 4))
+                    attack_rect = attack_text.get_rect(
+                        center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3.5 // 4)
+                    )
                     self.screen.blit(attack_text, attack_rect)
                 else:
                     attack_text = self.info_font.render(self.attack, True, WHITE)
-                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH // 4, SCREEN_HEIGHT * 3 // 4))
+                    attack_rect = attack_text.get_rect(
+                        center=(SCREEN_WIDTH // 4, SCREEN_HEIGHT * 3 // 4)
+                    )
                     self.screen.blit(attack_text, attack_rect)
 
-                    self.render_attack_animation(self.attack, SCREEN_WIDTH // 4 - 128, SCREEN_HEIGHT // 2 - 128)
+                    self.render_attack_animation(
+                        self.attack, SCREEN_WIDTH // 4 - 128, SCREEN_HEIGHT // 2 - 128
+                    )
                     self.play_attack_sound(self.attack)
 
             if self.opponent_attack and current_time < self.opponent_attack_timer:
                 if self.opponent_attack == "block":
                     attack_text = self.info_font.render("blocking...", True, WHITE)
-                    attack_rect = attack_text.get_rect(center=(SCREEN_WIDTH // 4, SCREEN_HEIGHT * 3.5 // 4))
+                    attack_rect = attack_text.get_rect(
+                        center=(SCREEN_WIDTH // 4, SCREEN_HEIGHT * 3.5 // 4)
+                    )
                 else:
-                    opponent_text = self.info_font.render(self.opponent_attack, True, WHITE)
-                    opponent_rect = opponent_text.get_rect(center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3 // 4))
+                    opponent_text = self.info_font.render(
+                        self.opponent_attack, True, WHITE
+                    )
+                    opponent_rect = opponent_text.get_rect(
+                        center=(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 3 // 4)
+                    )
                     self.screen.blit(opponent_text, opponent_rect)
 
                     self.render_attack_animation(
@@ -474,8 +518,9 @@ class Game:
                         SCREEN_WIDTH * 3 // 4 - 128,
                         SCREEN_HEIGHT // 2 - 128,
                         mirrored=True,
-                        is_opponent=True
+                        is_opponent=True,
                     )
+
     def render_end(self):
         self.screen.blit(self.start_bg, (0, 0))
 
@@ -489,27 +534,23 @@ class Game:
 
         if self.winner is not None:
             game_end_font = pygame.font.Font(
-                    f"{FONTS_FOLDER_PATH}/PressStart2P-Regular.ttf", 50
-                )
-            message = "You are the winner! :)" if self.winner else "You lost :("
-            end_text_2 = game_end_font.render(
-                message, True, WHITE
+                f"{FONTS_FOLDER_PATH}/PressStart2P-Regular.ttf", 50
             )
+            message = "You are the winner! :)" if self.winner else "You lost :("
+            end_text_2 = game_end_font.render(message, True, WHITE)
             end_rect_2 = end_text_2.get_rect(
-                center=(SCREEN_WIDTH// 2, SCREEN_HEIGHT // 2)
+                center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
             )
             self.screen.blit(end_text_2, end_rect_2)
 
         end_text_3 = self.info_font.render(
             "INFO: Press R to restart the game!", True, WHITE
         )
-        end_rect_3 = end_text_3.get_rect(
-            center=(SCREEN_WIDTH // 2, 50)
-        )
+        end_rect_3 = end_text_3.get_rect(center=(SCREEN_WIDTH // 2, 50))
         self.screen.blit(end_text_3, end_rect_3)
-    
+
     def restart_game(self):
-        self.attack_restore_time = None 
+        self.attack_restore_time = None
 
         # network client for multiplayer
         self.network = NetworkClient(host=os.getenv("IPV4_ADDR"))
@@ -528,7 +569,6 @@ class Game:
 
         self.init_start_time = 0
         self.winner = None
-        
 
     def render(self, frame):
         if self.state == START:
@@ -546,14 +586,14 @@ class Game:
         if input != None:
             if self.state == START:
                 self.state = INITIALIZE
-                mode_type = 'SINGLE PLAYER' if input else 'MULTIPLAYER'
+                mode_type = "SINGLE PLAYER" if input else "MULTIPLAYER"
                 print(f"STARTING {mode_type}")
                 self.initialize_game()
                 self.init_start_time = time.time()
 
-            elif 'state' in input and input['state'] == 'terminate':
+            elif "state" in input and input["state"] == "terminate":
                 self.state = TERMINATE
-                self.winner = input['winner'] if 'winner' in input else None
+                self.winner = input["winner"] if "winner" in input else None
                 self.backend.terminate()
 
             elif self.state == RUNNING and "AttackType" in input:
@@ -614,11 +654,11 @@ class Game:
 
         if self.attack and current_time >= self.attack_timer:
             self.attack = None
-            
+
         if self.attack_restore_time and time.time() > self.attack_restore_time:
             pygame.mixer.music.set_volume(1.0)
             self.attack_restore_time = None
-            
+
         if self.state in [START, INITIALIZE, TERMINATE]:
             self.play_music("general")
         elif self.state == RUNNING:
@@ -629,6 +669,15 @@ class Game:
 
     def run(self):
         while True:
+            if self.opponent_health <= 0:
+                self.state = TERMINATE
+                self.winner = True
+                self.backend.terminate()
+            elif self.player_health <= 0:
+                self.state = TERMINATE
+                self.winner = False
+                self.backend.terminate()
+
             input = self.backend.read()
             # print(input)
             self.handle_events(input)
